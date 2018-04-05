@@ -1,0 +1,18 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>netcoreapp2.0</TargetFramework>
+    <LangVersion>7.1</LangVersion>
+  </PropertyGroup>
+  <ItemGroup>
+    <Folder Include="Journeys.Http" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="Amazon.Lambda.Serialization.Json" Version="1.2.0" />
+    <PackageReference Include="Amazon.Lambda.SNSEvents" Version="1.0.0" />
+    <PackageReference Include="Amazon.Lambda.Tools" Version="2.1.2" />
+    <PackageReference Include="AWSSDK.SimpleNotificationService" Version="3.3.0.27" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\WaterGunBeetles.Shared\WaterGunBeetles.Shared.csproj" />
+  </ItemGroup>
+</Project>
