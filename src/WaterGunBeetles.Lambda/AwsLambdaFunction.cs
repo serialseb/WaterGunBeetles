@@ -9,81 +9,62 @@ using Newtonsoft.Json;
 
 namespace WaterGunBeetles.Lambda
 {
-  public class NullFunction : AwsLambdaFunction<NullJourneyTaker,NullJourney>{}
-
-  public class NullJourneyTaker : IJourneyTaker<NullJourney>
+  public class AwsLambdaFunction<TJourney, TJourneyResult>
   {
-    public Task TakeJourney<TJourney>(TJourney journey)
+    public delegate Task<TJourneyResult> JourneyTaker(TJourney journey);
+
+    readonly JourneyTaker _journeyTaker;
+
+    public AwsLambdaFunction(JourneyTaker journeyTaker)
     {
-      return Task.CompletedTask;
+      _journeyTaker = journeyTaker;
     }
-  }
 
-  public class NullJourney
-  {
-  }
-
-  public class AwsLambdaFunction<T, TJourney>
-    where T : IJourneyTaker<TJourney>, new()
-  {
     public async Task Handler(SNSEvent snsEvent, ILambdaContext context)
     {
       var command = JsonConvert.DeserializeObject<AwsLambdaRequest<TJourney>>(snsEvent.Records[0].Sns.Message);
 
-      var journeyTaker = new T();
-      var journeyReporter = new JourneyReporter<TJourney>();
+      var journeyReporter = new CloudWatchLogReporter<TJourney, TJourneyResult>(context.Logger);
 
       var executionInterval = command.Duration / command.RequestCount;
 
-      var taskSchedulingDelay = new Stopwatch();
-
-      var accumulatedDelay = TimeSpan.Zero;
+      var scheduler = new TaskSchedulingInterval();
       for (var i = 0; i < command.RequestCount; i++)
       {
-        taskSchedulingDelay.Restart();
+        scheduler.Start();
+        FireAndForgetJourneyWithLowMemoryStateDelegste(_journeyTaker, command, journeyReporter, i);
 
-        FireAndForgetJourneyWithLowMemoryStateDelegste(journeyTaker, command, journeyReporter, i);
-
-        taskSchedulingDelay.Stop();
-        var timeLeft = executionInterval - taskSchedulingDelay.Elapsed + accumulatedDelay;
-
-        if (timeLeft > TimeSpan.Zero)
-        {
-          accumulatedDelay = TimeSpan.Zero;
-          await Task.Delay(timeLeft);
-        }
-        else
-        {
-          accumulatedDelay = timeLeft;
-        }
+        await scheduler.WaitFor(executionInterval);
       }
+
+      journeyReporter.ReportCompleted();
     }
 
-    void FireAndForgetJourneyWithLowMemoryStateDelegste(T journeyTaker, AwsLambdaRequest<TJourney> command,
-      JourneyReporter<TJourney> journeyReporter, int journeyIndex)
+    void FireAndForgetJourneyWithLowMemoryStateDelegste(JourneyTaker journeyTaker, AwsLambdaRequest<TJourney> command,
+      CloudWatchLogReporter<TJourney, TJourneyResult> cloudWatchLogReporter, int journeyIndex)
     {
       Task.Factory.StartNew(
         iteration => InvokeJourney(
           journeyTaker,
           command.Journeys[(int) iteration % command.Journeys.Length],
-          journeyReporter),
+          cloudWatchLogReporter),
         journeyIndex);
     }
 
-    async Task InvokeJourney(IJourneyTaker<TJourney> journeyTaker,
+    async Task InvokeJourney(JourneyTaker journeyTaker,
       TJourney journey,
-      JourneyReporter<TJourney> journeyReporter)
+      CloudWatchLogReporter<TJourney, TJourneyResult> cloudWatchLogReporter)
     {
       var sw = Stopwatch.StartNew();
       try
       {
-        await journeyTaker.TakeJourney(journey);
+        var result = await journeyTaker(journey);
         sw.Stop();
-        journeyReporter.ReportSuccess(journey, sw.Elapsed);
+        cloudWatchLogReporter.ReportSuccess(journey, sw.Elapsed, result);
       }
       catch (Exception e)
       {
-        journeyReporter.ReportError(journey, sw.Elapsed, e);
+        cloudWatchLogReporter.ReportError(journey, sw.Elapsed, e);
       }
     }
   }

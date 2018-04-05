@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
 using System.Threading.Tasks;
 using Amazon.Auth.AccessControlPolicy;
@@ -9,15 +10,16 @@ using Amazon.Lambda;
 using Amazon.Lambda.Model;
 using Amazon.SimpleNotificationService;
 using Amazon.SimpleNotificationService.Model;
+using InvalidParameterValueException = Amazon.Lambda.Model.InvalidParameterValueException;
 using Statement = Amazon.Auth.AccessControlPolicy.Statement;
 
-namespace WaterGunBeetles
+namespace WaterGunBeetles.Aws
 {
   public class LambdaDeployer
   {
     readonly string _timestamp;
     readonly string _packagePath;
-    IEnumerable<string> _topics;
+    public IEnumerable<string> Topics { get; private set; }
     Func<Task> _cleanup;
 
     public LambdaDeployer(
@@ -48,9 +50,8 @@ namespace WaterGunBeetles
       });
 
 
-      var (roleArn, roleCleanup) = await CreateRole(iamClient, timestamp);
+      var (roleArn, roleName, roleCleanup) = await CreateRole(iamClient, timestamp);
       cleanup.Add(roleCleanup);
-
       try
       {
         for (var lambdaIndex = 0; lambdaIndex < count; lambdaIndex++)
@@ -66,7 +67,7 @@ namespace WaterGunBeetles
           var subCleaner = await Subscribe(snsClient, functionArn, topicArn);
           cleanup.Add(subCleaner);
 
-          var permCleanup = await AddPermission(lambdaClient, functionArn, topicArn);
+          var permCleanup = await AddExecutionFromSnsPermission(lambdaClient, functionArn, topicArn);
           cleanup.Add(permCleanup);
         }
       }
@@ -85,37 +86,97 @@ namespace WaterGunBeetles
       foreach (var c in cleanup) await c();
     }
 
-    static async Task<(string roleArn, Func<Task> roleCleanup)> CreateRole(
+    static async Task<(string roleArn, string roleName, Func<Task> roleCleanup)> CreateRole(
       AmazonIdentityManagementServiceClient iamClient, string timestamp)
     {
+      var assumeRolePolicyDocument = CreateLambdaAssumeRolePolicy().ToJson();
+      var roleName = $"Beetles_Role_{timestamp}";
+      var policyName = $"Beetles_CloudWatch_Access_{timestamp}";
+      
       var role = await iamClient.CreateRoleAsync(new CreateRoleRequest()
       {
-        RoleName = $"Bettles_Role_{timestamp}",
-        AssumeRolePolicyDocument = new Policy
+        RoleName = roleName,
+        AssumeRolePolicyDocument = assumeRolePolicyDocument
+      });
+      var roleArn = role.Role.Arn;
+
+      await iamClient.PutRolePolicyAsync(new PutRolePolicyRequest()
+      {
+        PolicyName = policyName,
+        RoleName = role.Role.RoleName,
+        PolicyDocument = CreateLambdaCloudWatchLogsPolicy().ToJson()
+      });
+
+      while (true)
+      {
+        var response = await iamClient.GetRoleAsync(new GetRoleRequest() {RoleName = role.Role.RoleName});
+        break;
+      }
+      
+      return (roleArn, role.Role.RoleName, async () =>
+      {
+        await iamClient.DeleteRolePolicyAsync(new DeleteRolePolicyRequest()
         {
-          Version = "2012-10-17",
-          Statements =
+          RoleName = role.Role.RoleName,
+          PolicyName = policyName
+        });
+        await iamClient.DeleteRoleAsync(new DeleteRoleRequest() {RoleName = role.Role.RoleName});
+      });
+    }
+
+    static Policy CreateLambdaAssumeRolePolicy()
+    {
+      return new Policy
+      {
+        Version = "2012-10-17",
+        Statements =
+        {
+          new Statement(Statement.StatementEffect.Allow)
           {
-            new Statement(Statement.StatementEffect.Allow)
+            Actions = {new ActionIdentifier("sts:AssumeRole")},
+            Id = "",
+            Principals =
             {
-              Actions = {new ActionIdentifier("sts:AssumeRole")},
-              Principals =
+              new Principal("lambda.amazonaws.com")
               {
-                new Principal("lambda.amazonaws.com")
-                {
-                  Provider = "Service"
-                }
+                Provider = "Service"
               }
             }
           }
-        }.ToJson()
-      });
-      var roleArn = role.Role.Arn;
-      return (roleArn, async () =>
-        await iamClient.DeleteRoleAsync(new DeleteRoleRequest() {RoleName = role.Role.RoleName}));
+        }
+      };
     }
 
-    static async Task<Func<Task>> AddPermission(AmazonLambdaClient lambda, string functionArn, string topicArn)
+    static Policy CreateLambdaCloudWatchLogsPolicy()
+    {
+      return new Policy
+      {
+        Version = "2012-10-17",
+        Statements =
+        {
+          new Statement(Statement.StatementEffect.Allow)
+          {
+            Actions =
+            {
+              new ActionIdentifier("logs:CreateLogGroup"),
+              new ActionIdentifier("logs:CreateLogStream"),
+              new ActionIdentifier("logs:DescribeLogGroups"),
+              new ActionIdentifier("logs:DescribeLogStreams"),
+              new ActionIdentifier("logs:GetLogEvents"),
+              new ActionIdentifier("logs:PutLogEvents"),
+              new ActionIdentifier("logs:FilterLogEvents"),
+            },
+            Id = "",
+            Resources =
+            {
+              new Resource("arn:aws:logs:*:*:*")
+            }
+          }
+        }
+      };
+    }
+
+    static async Task<Func<Task>> AddExecutionFromSnsPermission(AmazonLambdaClient lambda, string functionArn, string topicArn)
     {
       await lambda.AddPermissionAsync(new Amazon.Lambda.Model.AddPermissionRequest
       {
@@ -148,7 +209,7 @@ namespace WaterGunBeetles
     static async Task<(string topicArn, Func<Task> topicCleanup)> CreateTopic(
       AmazonSimpleNotificationServiceClient snsClient, string timestamp, int lambdaIndex)
     {
-      var topic = await snsClient.CreateTopicAsync($"BeetleSays_{timestamp}_{lambdaIndex}");
+      var topic = await snsClient.CreateTopicAsync($"Beetles_{timestamp}_{lambdaIndex}");
       return (topic.TopicArn, async () => await snsClient.DeleteTopicAsync(topic.TopicArn));
     }
 
@@ -157,21 +218,33 @@ namespace WaterGunBeetles
       string roleArn,
       string timestamp, int lambdaIndex, AmazonLambdaClient lambda, string packagePath)
     {
-      var functionName = $"Beetle_{timestamp}_{lambdaIndex}";
+      var functionName = $"Beetles_{timestamp}_{lambdaIndex}";
 
-      var function = await lambda.CreateFunctionAsync(new CreateFunctionRequest
+      var retryWait = Stopwatch.StartNew();
+      CreateFunctionResponse function = null;
+      do
       {
-        Code = new FunctionCode {ZipFile = new MemoryStream(File.ReadAllBytes(packagePath))},
-        Description = "Beetle Tester Function",
-        FunctionName = functionName,
-        Handler = "WaterGunBeetles.Lambda::WaterGunBeetles.Lambda.NullFunction::Handler",
-        MemorySize = memorySize,
-        Publish = true,
-        Role = roleArn, // replace with the actual arn of the execution role you created
-        Runtime = "dotnetcore2.0",
-        Timeout = 120,
-        VpcConfig = new VpcConfig { }
-      });
+        try
+        {
+          function = await lambda.CreateFunctionAsync(new CreateFunctionRequest
+          {
+            Code = new FunctionCode {ZipFile = new MemoryStream(File.ReadAllBytes(packagePath))},
+            Description = "Beetle Tester Function",
+            FunctionName = functionName,
+            Handler = "WaterGunBeetles.Lambda::WaterGunBeetles.Lambda.NullFunction::Handler",
+            MemorySize = memorySize,
+            Publish = true,
+            Role = roleArn,
+            Runtime = "dotnetcore2.0",
+            Timeout = 120,
+            VpcConfig = new VpcConfig { }
+          });
+        }
+        catch (InvalidParameterValueException) when (retryWait.Elapsed < TimeSpan.FromMinutes(1))
+        {
+        }
+      } while (function == null);
+
       var functionArn = function.FunctionArn;
       return (functionArn, functionName, async () => await lambda.DeleteFunctionAsync(functionName));
     }
@@ -180,13 +253,15 @@ namespace WaterGunBeetles
     {
       var (topics, cleanup) = await CreateLambdas(count, memorySize, _timestamp, _packagePath);
 
-      _topics = topics;
+      Topics = topics;
       _cleanup = cleanup;
     }
 
     public async Task Shutdown()
     {
-      await _cleanup();
+      if (_cleanup != null)
+        await _cleanup.Invoke();
+      _cleanup = null;
     }
   }
 }

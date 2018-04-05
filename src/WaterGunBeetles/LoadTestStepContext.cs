@@ -9,7 +9,7 @@ namespace WaterGunBeetles
 {
   public class LoadTestStepContext<TJourney>
   {
-    public Stopwatch Elapsed { get; set; }
+    public Stopwatch ExecutionTime { get; set; }
     public CancellationToken Cancel { get; set; }
     public int RequestsPerSecond { get; set; }
     public TimeSpan Duration { get; set; }

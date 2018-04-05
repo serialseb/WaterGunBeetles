@@ -8,6 +8,7 @@ using Newtonsoft.Json;
 using Shouldly;
 using Tests.Infrastructure;
 using WaterGunBeetles;
+using WaterGunBeetles.Aws;
 using Xunit;
 
 namespace Tests

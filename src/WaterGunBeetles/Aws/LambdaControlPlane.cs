@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
@@ -7,7 +8,7 @@ using Amazon.SimpleNotificationService;
 using Amazon.SimpleNotificationService.Model;
 using Newtonsoft.Json;
 
-namespace WaterGunBeetles
+namespace WaterGunBeetles.Aws
 {
   public class LambdaControlPlane : IControlPlane
   {
@@ -37,29 +38,33 @@ namespace WaterGunBeetles
       {
         TopicArn = _controlPlaneTopicArns[i % _controlPlaneTopicArns.Length],
         Message = JsonConvert.SerializeObject(request)
-      });
+      }).ToList();
 
       await ctx.PublishAsync(publishRequests, ctx.Cancel);
     }
 
     readonly string[] _controlPlaneTopicArns;
+    readonly Action<object> _details;
 
     public LambdaControlPlane(
       string[] controlPlaneTopicArns,
-      Func<IEnumerable<PublishRequest>, CancellationToken, Task> publisher = null)
+      Func<IEnumerable<PublishRequest>, CancellationToken, Task> publisher = null,
+      Action<object> detailsLog = null)
     {
       _controlPlaneTopicArns = controlPlaneTopicArns;
+      _details = detailsLog ?? (_ => { });
       Publisher = publisher ?? SnsPublisher;
     }
 
-    static async Task SnsPublisher(IEnumerable<PublishRequest> publishRequests,
-      CancellationToken cancellationToken)
+    async Task SnsPublisher(IEnumerable<PublishRequest> publishRequests, CancellationToken cancellationToken)
     {
+      var sw = Stopwatch.StartNew();
       using (var snsClient = new AmazonSimpleNotificationServiceClient(Amazon.RegionEndpoint.EUWest2))
       {
-        foreach (var publishRequest in publishRequests)
-          await snsClient.PublishAsync(publishRequest, cancellationToken);
+        await Task.WhenAll(publishRequests.Select(async r => await snsClient.PublishAsync(r, cancellationToken)));
       }
+
+      _details($"[VERBOSE] Published {publishRequests.Count()} in {sw.Elapsed}");
     }
 
     public Func<IEnumerable<PublishRequest>, CancellationToken, Task> Publisher { get; set; }

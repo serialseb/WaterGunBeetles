@@ -1,7 +1,11 @@
 ﻿using System;
 using System.IO;
+using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
+using Amazon.SimpleNotificationService.Model;
 using CommandLine;
+using WaterGunBeetles.Aws;
 
 namespace WaterGunBeetles.Cli
 {
@@ -17,15 +21,75 @@ namespace WaterGunBeetles.Cli
 
     static async Task<int> SquirtAsync(SquirtOptions options)
     {
+      var ctrlC = new CancellationTokenSource();
+      Console.CancelKeyPress += (sender, args) =>
+      {
+        Console.WriteLine("Beetles, abort mission!");
+        ctrlC.Cancel();
+      };
+      
       var timestamp = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
+      var packagePath = options.PackagePath ?? GetDefaultPackagePath();
       var deployer = new LambdaDeployer(
         timestamp: timestamp.ToString(),
-        packagePath: options.PackagePath ?? GetDefaultPackagePath());
-      Console.WriteLine("Beetle fleets, assemble...");
-      await deployer.Deploy(10, options.MemorySize);
-      Console.WriteLine("Beetles, attack!");
-      await deployer.Shutdown();
+        packagePath: packagePath);
+      
+      var rps = options.RequestsPerSecond;
+      var to = options.RampUpTo ?? rps;
+      var duration = ParseDuration(options.Duration);
+      Console.WriteLine($"Load testing from {rps}rps to {to}rps for {duration} using lambda {packagePath}");
+      try
+      {
+        Console.WriteLine("Beetles are assembling...");
+        await deployer.Deploy(10, options.MemorySize);
+        Console.WriteLine("Beetles, attack!");
+
+        var detailsLog = options.Verbose ? (Action<object>)WriteDetail : null;
+        var lambdaControlPlane = new LambdaControlPlane(deployer.Topics.ToArray(), detailsLog: detailsLog);
+        
+        var nullLoadTest = new LoadTest<NullJourney>(
+          rps,
+          to,
+          duration,
+          new NullJourneyScript(),
+          lambdaControlPlane,
+          PrintLoadStep);
+        var result = await nullLoadTest.RunAsync(ctrlC.Token);
+        Console.WriteLine($"Beetles have returned in {result.Elapsed}.");
+      }
+      finally
+      {
+        Console.WriteLine("Calling back the beetles...");
+        await deployer.Shutdown();
+      }
+
+      Console.WriteLine("It's goodbye from them, and it's goodbye from me.");
       return 0;
+    }
+
+    static void WriteDetail(object obj)
+    {
+      var prev = Console.ForegroundColor;
+      Console.ForegroundColor = ConsoleColor.DarkGray;
+      Console.WriteLine(obj);
+      Console.ForegroundColor = prev;
+    }
+
+    static TimeSpan ParseDuration(string duration)
+    {
+      if (duration.EndsWith("s"))
+        return TimeSpan.FromSeconds(Convert.ToDouble(duration.Substring(0, duration.Length - 1)));
+      if (duration.EndsWith("m"))
+        return TimeSpan.FromMinutes(Convert.ToDouble(duration.Substring(0, duration.Length - 1)));
+      if (duration.EndsWith("h"))
+        return TimeSpan.FromHours(Convert.ToDouble(duration.Substring(0, duration.Length - 1)));
+
+      return TimeSpan.Parse(duration);
+    }
+
+    static void PrintLoadStep(LoadTestStepContext<NullJourney> obj)
+    {
+      Console.WriteLine($"[{obj.ExecutionTime.Elapsed}] Beetles in flight at {obj.RequestsPerSecond}rps");
     }
 
     static string GetDefaultPackagePath()
@@ -36,17 +100,8 @@ namespace WaterGunBeetles.Cli
       {
         throw new ArgumentException($"Could not find a package at {filePath}.");
       }
+
       return filePath;
     }
-  }
-
-  [Verb("squirt", HelpText = "Start a load test.")]
-  class SquirtOptions
-  {
-    [Option]
-    public string PackagePath { get; set; }
-
-    [Option('m', Default = 128, HelpText = "The memory size used for the lambda function")]
-    public int MemorySize { get; set; }
   }
 }

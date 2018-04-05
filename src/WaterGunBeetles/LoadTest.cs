@@ -11,17 +11,21 @@ namespace WaterGunBeetles
   {
     readonly IJourneyScript<TJourney> _testScript;
     readonly IControlPlane _controlPlane;
+    readonly Action<LoadTestStepContext<TJourney>> _onStep;
     readonly Func<IEnumerable<PublishRequest>, CancellationToken, Task> _publisher;
     readonly LinearRampingStrategy _stategy;
 
-    public LoadTest(int requestsPerSecond,
+    public LoadTest(
+      int requestsPerSecond,
       int rampUpTo,
       TimeSpan duration,
       IJourneyScript<TJourney> testScript,
-      IControlPlane controlPlane)
+      IControlPlane controlPlane,
+      Action<LoadTestStepContext<TJourney>> onStep = null)
     {
       _testScript = testScript;
       _controlPlane = controlPlane;
+      _onStep = onStep ?? (_=>{});
       _publisher = controlPlane.Publisher;
       _stategy = new LinearRampingStrategy(requestsPerSecond, rampUpTo, duration);
     }
@@ -31,33 +35,37 @@ namespace WaterGunBeetles
       await _testScript.Initialize();
       var ctx = new LoadTestStepContext<TJourney>
       {
-        Elapsed = Stopwatch.StartNew(),
+        ExecutionTime = Stopwatch.StartNew(),
         Cancel = token,
         LoadTestId = Guid.NewGuid(),
         TestScript = _testScript,
         PublishAsync = _publisher
       };
 
-      var stepTime = new Stopwatch();
+      var schedulingInterval = new TaskSchedulingInterval();
       foreach (var step in _stategy.GetSteps())
       {
-        stepTime.Reset();
+        schedulingInterval.Start();
         ctx.RequestsPerSecond = step.requestsPerSecond;
         ctx.Duration = step.waitFor;
 
-        await _controlPlane.SetLoad(ctx);
+        await SetLoad(ctx);
 
-        var next = step.waitFor - stepTime.Elapsed;
-        if (next > TimeSpan.Zero)
-          await Task.Delay(next, token);
+        await schedulingInterval.WaitFor(step.waitFor);
         if (token.IsCancellationRequested)
           break;
       }
 
 
-      ctx.Elapsed.Stop();
+      ctx.ExecutionTime.Stop();
 
-      return new LoadTestResult();
+      return new LoadTestResult(ctx.ExecutionTime.Elapsed);
+    }
+
+    async Task SetLoad(LoadTestStepContext<TJourney> ctx)
+    {
+      _onStep(ctx);
+      await _controlPlane.SetLoad(ctx);
     }
 
     public Task Close()
