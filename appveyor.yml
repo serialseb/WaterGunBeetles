@@ -47,7 +47,7 @@ install:
   - gem install chandler --no-ri --no-rdoc
   - ps: set-content ~/.netrc "machine api.github.com login $env:github_username password $env:github_password" -encoding ascii
   - ps: cp ~/.netrc ~/_netrc
-  - ps: if ($branch -eq "master") {chandler push }
+  - ps: if ($branch -eq "master") { chandler push }
 
 before_build:
   - cmd: set PATH=C:\Program Files (x86)\Microsoft Visual Studio\2017\Enterprise\MSBuild\15.0\Bin;C:\Program Files (x86)\Microsoft Visual Studio\2017\Community\MSBuild\15.0\Bin;C:\Program Files (x86)\Microsoft Visual Studio\2017\Professional\MSBuild\15.0\Bin;%PATH%

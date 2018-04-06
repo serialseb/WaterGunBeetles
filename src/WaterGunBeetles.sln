@@ -15,6 +15,7 @@ ProjectSection(SolutionItems) = preProject
 	..\appveyor.yml = ..\appveyor.yml
 	..\README.md = ..\README.md
 	..\LICENSE = ..\LICENSE
+	..\CHANGELOG.md = ..\CHANGELOG.md
 EndProjectSection
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "demos", "demos", "{85D59BA3-00D2-40FF-8EFF-2E276F76F2B1}"
