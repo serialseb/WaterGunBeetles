@@ -84,7 +84,7 @@ after_build:
       nuget pack WaterGunBeetles.Templates.CSharp\.template.config\template.nuspec -Version $semver
 
 artifacts:
-  - path: '*.nupkg'
+  - path: 'src\*.nupkg'
     
 environment:
   SSL_CERT_FILE: C:\ca\cacert.pem
