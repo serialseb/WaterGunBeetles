@@ -1,11 +1,15 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Reflection;
+using System.Runtime.Loader;
 using System.Threading;
 using System.Threading.Tasks;
 using Amazon.SimpleNotificationService.Model;
 using CommandLine;
 using WaterGunBeetles.Aws;
+using WaterGunBeetles.Lambda;
 
 namespace WaterGunBeetles.Cli
 {
@@ -29,7 +33,9 @@ namespace WaterGunBeetles.Cli
       };
       
       var timestamp = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
-      var packagePath = options.PackagePath ?? GetDefaultPackagePath();
+      var packagePath = options.PackagePath ?? GetDefaultPackagePath(options.Configuration, options.Framework);
+      
+      var target = LoadTypeInfo(options.Configuration, options.Framework);
       var deployer = new LambdaDeployer(
         timestamp: timestamp.ToString(),
         packagePath: packagePath);
@@ -46,14 +52,16 @@ namespace WaterGunBeetles.Cli
 
         var detailsLog = options.Verbose ? (Action<object>)WriteDetail : null;
         var lambdaControlPlane = new LambdaControlPlane(deployer.Topics.ToArray(), detailsLog: detailsLog);
-        
-        var nullLoadTest = new LoadTest<NullJourney>(
+
+        Func<int, IEnumerable<object>> storyTeller = null;
+        var nullLoadTest = new LoadTest(
           rps,
           to,
           duration,
-          new NullJourneyScript(),
+          storyTeller,
           lambdaControlPlane,
           PrintLoadStep);
+        
         var result = await nullLoadTest.RunAsync(ctrlC.Token);
         Console.WriteLine($"Beetles have returned in {result.Elapsed}.");
       }
@@ -65,6 +73,27 @@ namespace WaterGunBeetles.Cli
 
       Console.WriteLine("It's goodbye from them, and it's goodbye from me.");
       return 0;
+    }
+
+    static (Assembly assembly, Type journeyType, Type journeyResponseType, TypeInfo storyTellerType) LoadTypeInfo(string configuration, string framework)
+    {
+        var proj = new DirectoryInfo(Directory.GetCurrentDirectory()).Name;
+      var assemblyPath = Path.Combine(Environment.CurrentDirectory, "bin", configuration, framework, proj) + ".dll";
+      if (File.Exists(assemblyPath) == false)
+        throw new ArgumentException($"Could not find an assembly at {assemblyPath}");
+      var assembly = AssemblyLoadContext.Default.LoadFromAssemblyPath(assemblyPath);
+      var functionType = assembly.DefinedTypes
+                           .FirstOrDefault(t =>
+                             t.IsGenericType && t.GetGenericTypeDefinition() == typeof(AwsLambdaFunction<,>))
+                         ?? throw new ArgumentException(
+                           $"Could not find a type inheriting from {typeof(AwsLambdaFunction<,>)}");
+      var args = functionType.GenericTypeArguments;
+      var journeyType = args[0];
+      var journeyResponseType = args[1];
+      var storyTellerInterface = typeof(IJourneyScript<>).MakeGenericType(journeyType);
+      var storyTellerType = assembly.DefinedTypes.FirstOrDefault(t => storyTellerInterface.IsAssignableFrom(t))
+                            ?? throw new ArgumentException($"Could not find a type implementing {storyTellerInterface}");
+      return (assembly,journeyType, journeyResponseType, storyTellerType);
     }
 
     static void WriteDetail(object obj)
@@ -87,15 +116,15 @@ namespace WaterGunBeetles.Cli
       return TimeSpan.Parse(duration);
     }
 
-    static void PrintLoadStep(LoadTestStepContext<NullJourney> obj)
+    static void PrintLoadStep(LoadTestStepContext obj)
     {
       Console.WriteLine($"[{obj.ExecutionTime.Elapsed}] Beetles in flight at {obj.RequestsPerSecond}rps");
     }
 
-    static string GetDefaultPackagePath()
+    static string GetDefaultPackagePath(string configuration, string framework)
     {
       var proj = new DirectoryInfo(Directory.GetCurrentDirectory()).Name;
-      var filePath = Path.Combine(Environment.CurrentDirectory, "bin", "Release", "netcoreapp2.0", proj) + ".zip";
+      var filePath = Path.Combine(Environment.CurrentDirectory, "bin", configuration, framework, proj) + ".zip";
       if (!File.Exists(filePath))
       {
         throw new ArgumentException($"Could not find a package at {filePath}.");

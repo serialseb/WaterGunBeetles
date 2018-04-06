@@ -1,17 +1,19 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Amazon.SimpleNotificationService.Model;
 
 namespace WaterGunBeetles
 {
-  public class LoadTest<TJourney>
+
+  public class LoadTest
   {
-    readonly IJourneyScript<TJourney> _testScript;
+    readonly Func<int, IEnumerable<object>> _storyTeller;
     readonly IControlPlane _controlPlane;
-    readonly Action<LoadTestStepContext<TJourney>> _onStep;
+    readonly Action<LoadTestStepContext> _onStep;
     readonly Func<IEnumerable<PublishRequest>, CancellationToken, Task> _publisher;
     readonly LinearRampingStrategy _stategy;
 
@@ -19,11 +21,12 @@ namespace WaterGunBeetles
       int requestsPerSecond,
       int rampUpTo,
       TimeSpan duration,
-      IJourneyScript<TJourney> testScript,
+      
+      Func<int, IEnumerable<object>> storyTeller,
       IControlPlane controlPlane,
-      Action<LoadTestStepContext<TJourney>> onStep = null)
+      Action<LoadTestStepContext> onStep = null)
     {
-      _testScript = testScript;
+      _storyTeller = storyTeller;
       _controlPlane = controlPlane;
       _onStep = onStep ?? (_=>{});
       _publisher = controlPlane.Publisher;
@@ -32,13 +35,12 @@ namespace WaterGunBeetles
 
     public async Task<LoadTestResult> RunAsync(CancellationToken token = default)
     {
-      await _testScript.Initialize();
-      var ctx = new LoadTestStepContext<TJourney>
+      var ctx = new LoadTestStepContext
       {
         ExecutionTime = Stopwatch.StartNew(),
         Cancel = token,
         LoadTestId = Guid.NewGuid(),
-        TestScript = _testScript,
+        StoryTeller = _storyTeller,
         PublishAsync = _publisher
       };
 
@@ -62,15 +64,10 @@ namespace WaterGunBeetles
       return new LoadTestResult(ctx.ExecutionTime.Elapsed);
     }
 
-    async Task SetLoad(LoadTestStepContext<TJourney> ctx)
+    async Task SetLoad(LoadTestStepContext ctx)
     {
       _onStep(ctx);
       await _controlPlane.SetLoad(ctx);
-    }
-
-    public Task Close()
-    {
-      return Task.CompletedTask;
     }
   }
 }

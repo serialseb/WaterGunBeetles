@@ -19,8 +19,14 @@ namespace WaterGunBeetles.Cli
 
     [Option('t', Default = null)]
     public int? RampUpTo { get; set; }
-    
-    [Option('v', Default=false)]
+
+    [Option('v', Default = false)]
     public bool Verbose { get; set; }
+
+    [Option('r', Default = "Release")]
+    public string Configuration { get; set; }
+    
+    [Option('f', Default="netcoreapp2.0")]
+    public string Framework { get; set; }
   }
 }

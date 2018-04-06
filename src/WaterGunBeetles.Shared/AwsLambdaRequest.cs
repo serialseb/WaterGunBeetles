@@ -2,9 +2,15 @@
 
 namespace WaterGunBeetles
 {
-  public class AwsLambdaRequest<TJourney>
+  public class AwsLambdaRequest
   {
-    public TJourney[] Journeys { get; set; }
+    public object[] Journeys { get; set; }
+    public TimeSpan Duration { get; set; }
+    public int RequestCount { get; set; }
+  }
+  public class AwsLambdaRequest<T>
+  {
+    public T[] Journeys { get; set; }
     public TimeSpan Duration { get; set; }
     public int RequestCount { get; set; }
   }

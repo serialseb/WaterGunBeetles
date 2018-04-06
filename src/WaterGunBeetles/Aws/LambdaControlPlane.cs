@@ -14,7 +14,7 @@ namespace WaterGunBeetles.Aws
   {
     const int MaxConcurrentExecutionPerLambda = 200;
 
-    public async Task SetLoad<TJourney>(LoadTestStepContext<TJourney> ctx)
+    public async Task SetLoad(LoadTestStepContext ctx)
     {
       var totalRequestsRoundedUp = (int) Math.Ceiling(ctx.RequestsPerSecond * ctx.Duration.TotalSeconds);
 
@@ -27,10 +27,10 @@ namespace WaterGunBeetles.Aws
           ? totalRequestsPerLambda + 1
           : totalRequestsPerLambda)
         .Where(count => count > 0)
-        .Select(count => new AwsLambdaRequest<TJourney>
+        .Select(count => new AwsLambdaRequest
         {
           RequestCount = count,
-          Journeys = ctx.TestScript.CreateJourneys(count).ToArray(),
+          Journeys = ctx.StoryTeller(count).ToArray(),
           Duration = ctx.Duration
         });
 

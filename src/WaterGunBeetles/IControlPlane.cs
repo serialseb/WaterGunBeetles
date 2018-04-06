@@ -8,7 +8,7 @@ namespace WaterGunBeetles
 {
   public interface IControlPlane
   {
-    Task SetLoad<TJourney>(LoadTestStepContext<TJourney> ctx);
+    Task SetLoad(LoadTestStepContext ctx);
     Func<IEnumerable<PublishRequest>, CancellationToken, Task> Publisher { get; set; }
   }
 }
