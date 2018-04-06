@@ -54,11 +54,6 @@ install:
         $nuspec = [xml](get-content $templateNuspecPath)
         $nuspec.package.metadata.version = $semver
         $nuspec.Save($templateNuspecPath)
-        $csprojPath = Resolve-Path src\WaterGunBeetles.Templates.CSharp\WaterGunBeetles.Templates.CSharp.csproj
-        $csproj = [xml](get-content $csprojPath)
-        $csproj.Project.ItemGroup.DotNetCliToolReference | ? { $_.Include -eq "WaterGunBeetles.Cli" } | % { $_.Version = $semver }
-        $csproj.Project.ItemGroup.PackageReference | ? { $_.Include -eq "WaterGunBeetles" } | % { $_.Version = $semver }
-        $csproj.Save($csprojPath)
           
 
 before_build:
