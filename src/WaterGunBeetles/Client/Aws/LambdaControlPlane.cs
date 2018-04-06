@@ -61,7 +61,7 @@ namespace WaterGunBeetles.Client.Aws
       _controlPlaneTopicArns = controlPlaneTopicArns;
       _details = detailsLog ?? (_ => { });
       Publisher = publisher ?? SnsPublisher;
-      _snsClient = new Lazy<AmazonSimpleNotificationServiceClient>(new AmazonSimpleNotificationServiceClient(Amazon.RegionEndpoint.EUWest2));
+      _snsClient = new Lazy<AmazonSimpleNotificationServiceClient>(()=>new AmazonSimpleNotificationServiceClient(Amazon.RegionEndpoint.EUWest2));
     }
 
     async Task SnsPublisher(IEnumerable<PublishRequest> publishRequests, CancellationToken cancellationToken)
