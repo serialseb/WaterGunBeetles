@@ -11,6 +11,11 @@ EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "WaterGunBeetles.Cli", "WaterGunBeetles.Cli\WaterGunBeetles.Cli.csproj", "{7B5C1ED8-FF4E-49C4-8155-F6D72A6679BA}"
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = ".meta", ".meta", "{13FF60E3-A216-4159-BF88-9CD5E4696DD2}"
+ProjectSection(SolutionItems) = preProject
+	..\appveyor.yml = ..\appveyor.yml
+	..\README.md = ..\README.md
+	..\LICENSE = ..\LICENSE
+EndProjectSection
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "demos", "demos", "{85D59BA3-00D2-40FF-8EFF-2E276F76F2B1}"
 EndProject

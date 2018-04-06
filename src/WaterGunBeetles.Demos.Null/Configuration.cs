@@ -1,5 +1,9 @@
 ﻿using System.Linq;
+using System.Runtime.CompilerServices;
 using System.Threading.Tasks;
+using WaterGunBeetles.Server.Aws;
+
+[assembly: TypeForwardedTo(typeof(LambdaFunction))]
 
 namespace WaterGunBeetles.Demos.Null
 {

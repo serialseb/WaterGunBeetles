@@ -1,12 +1,15 @@
 ﻿using System;
+using System.IO;
 using System.Threading.Tasks;
 using Amazon.Lambda.Core;
 using Amazon.Lambda.SNSEvents;
+using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
 using WaterGunBeetles.Internal;
 
 namespace WaterGunBeetles.Server.Aws
 {
-  public class LambdaFunction : ILambdaFunction
+  public class LambdaFunction
   {
     static LambdaFunction()
     {
@@ -22,9 +25,14 @@ namespace WaterGunBeetles.Server.Aws
 
     static BeetlesMetaModel Model { get; set; }
 
-    public Task Handle(SNSEvent snsEvent, ILambdaContext context)
+    public Task Handle(Stream snsEvent, ILambdaContext context)
     {
-      return Factory().Handle(snsEvent, context);
+      using (StreamReader sr = new StreamReader(snsEvent))
+      using (JsonReader reader = new JsonTextReader(sr))
+      {
+        var msg = new JsonSerializer().Deserialize<SNSEvent>(reader);
+        return Factory().Handle(msg, context);
+      }
     }
   }
 }

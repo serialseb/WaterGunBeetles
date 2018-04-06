@@ -25,8 +25,8 @@ namespace WaterGunBeetles.Client.Aws
     public IEnumerable<string> Topics { get; private set; }
     Func<Task> _cleanup;
 
-    static readonly string LambdaHandlerName =
-      $"{typeof(LambdaFunction).Assembly.GetName().Name}::{typeof(LambdaFunction).FullName}::{nameof(LambdaFunction.Handle)}";
+
+    readonly string _lambdaHandlerName;
 
     public LambdaDeployer(string timestamp,
       string packagePath, Type settingsType)
@@ -34,6 +34,8 @@ namespace WaterGunBeetles.Client.Aws
       _timestamp = timestamp;
       _packagePath = packagePath;
       _settingsType = settingsType;
+      _lambdaHandlerName = $"{settingsType.Assembly.GetName().Name}::{typeof(LambdaFunction).FullName}::{nameof(LambdaFunction.Handle)}";
+
     }
 
     static async Task<(IEnumerable<string> topicsArn, Func<Task> cleanup)> CreateLambdas(
@@ -41,7 +43,8 @@ namespace WaterGunBeetles.Client.Aws
       int memorySize,
       string timestamp,
       string packagePath,
-      string settingsTypeName)
+      string settingsTypeName,
+      string lambdaHandlerName)
     {
       var cleanup = new List<Func<Task>>();
       var publishTopics = new List<string>(count);
@@ -68,7 +71,7 @@ namespace WaterGunBeetles.Client.Aws
         {
           var (functionArn, _, functionCleanup) =
             await CreateFunction(memorySize, roleArn, timestamp, lambdaIndex, lambdaClient, packagePath,
-              settingsTypeName);
+              settingsTypeName, lambdaHandlerName);
           cleanup.Add(functionCleanup);
 
           var (topicArn, topicCleanup) = await CreateTopic(snsClient, timestamp, lambdaIndex);
@@ -222,7 +225,8 @@ namespace WaterGunBeetles.Client.Aws
     static async Task<(string functionArn, string functionName, Func<Task> functionCleanup)> CreateFunction(
       int memorySize,
       string roleArn,
-      string timestamp, int lambdaIndex, AmazonLambdaClient lambda, string packagePath, string configurationTypeName)
+      string timestamp, int lambdaIndex, AmazonLambdaClient lambda, string packagePath, string configurationTypeName,
+      string lambdaHandlerName)
     {
       var functionName = $"Beetles_{timestamp}_{lambdaIndex}";
 
@@ -237,7 +241,7 @@ namespace WaterGunBeetles.Client.Aws
             Code = new FunctionCode {ZipFile = new MemoryStream(File.ReadAllBytes(packagePath))},
             Description = "Beetle Tester Function",
             FunctionName = functionName,
-            Handler = LambdaHandlerName,
+            Handler = lambdaHandlerName,
             MemorySize = memorySize,
             Publish = true,
             Role = roleArn,
@@ -265,7 +269,7 @@ namespace WaterGunBeetles.Client.Aws
     public async Task Deploy(int count, int memorySize)
     {
       var (topics, cleanup) =
-        await CreateLambdas(count, memorySize, _timestamp, _packagePath, _settingsType.AssemblyQualifiedName);
+        await CreateLambdas(count, memorySize, _timestamp, _packagePath, _settingsType.AssemblyQualifiedName, _lambdaHandlerName);
 
       Topics = topics;
       _cleanup = cleanup;
