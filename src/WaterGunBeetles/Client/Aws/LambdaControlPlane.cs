@@ -51,7 +51,7 @@ namespace WaterGunBeetles.Client.Aws
 
     readonly string[] _controlPlaneTopicArns;
     readonly Action<object> _details;
-    AmazonSimpleNotificationServiceClient _snsClient;
+    readonly Lazy<AmazonSimpleNotificationServiceClient> _snsClient;
 
     public LambdaControlPlane(
       string[] controlPlaneTopicArns,
@@ -61,13 +61,13 @@ namespace WaterGunBeetles.Client.Aws
       _controlPlaneTopicArns = controlPlaneTopicArns;
       _details = detailsLog ?? (_ => { });
       Publisher = publisher ?? SnsPublisher;
-      _snsClient =new AmazonSimpleNotificationServiceClient(Amazon.RegionEndpoint.EUWest2);
+      _snsClient = new Lazy<AmazonSimpleNotificationServiceClient>(new AmazonSimpleNotificationServiceClient(Amazon.RegionEndpoint.EUWest2));
     }
 
     async Task SnsPublisher(IEnumerable<PublishRequest> publishRequests, CancellationToken cancellationToken)
     {
       var sw = Stopwatch.StartNew();
-        await Task.WhenAll(publishRequests.Select(r=>Task.Run(() => _snsClient.PublishAsync(r, cancellationToken), cancellationToken)));
+        await Task.WhenAll(publishRequests.Select(r=>Task.Run(() => _snsClient.Value.PublishAsync(r, cancellationToken), cancellationToken)));
 
       _details($"[VERBOSE] Published {publishRequests.Count()} in {sw.Elapsed}");
     }

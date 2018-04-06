@@ -80,7 +80,7 @@ namespace Tests
         requestsPerSecond,
         rampUpTo,
         duration,
-        async count => new[]{new MemoryJourney()},
+        async count => new[] {new MemoryJourney()},
         new LambdaControlPlane(new[] {"topic1"}, (requests, token) =>
         {
           publishedRequests.Add(requests.ToList());
