@@ -2,7 +2,7 @@
 using System.Collections.Generic;
 using System.Threading.Tasks;
 
-namespace WaterGunBeetles.ConsoleTemplate.CSharp
+namespace WaterGunBeetles.Templates.CSharp
 {
   public class StoryTeller
   {

@@ -1,0 +1,22 @@
+<?xml version="1.0"?>
+<package>
+    <metadata>
+        <id>WaterGunBeetles.Templates.CSharp</id>
+        <version>1.0.0-preview.0</version>
+        <title>WaterGunBeetles Templates</title>
+        <authors>serialseb</authors>
+        <owners>serialseb</owners>
+        <licenseUrl>https://github.com/serialseb/WaterGunBeetles/blob/master/LICENSE</licenseUrl>
+        <projectUrl>https://github.com/serialseb/WaterGunBeetles</projectUrl>
+        <requireLicenseAcceptance>false</requireLicenseAcceptance>
+        <description>Load test anything using a swarm of Beetles running on Lambdas!</description>
+        <copyright>Copyright 2018 Videndel</copyright>
+        <tags>load-testing aws-lambda aws-lambda-csharp dotnet dotnet-core</tags>
+        <packageTypes>
+            <packageType name="Template" />
+        </packageTypes>
+    </metadata>
+    <files>
+        <file src="..\**\*.*" exclude="..\bin\**\*;..\obj\**\*;..\.template.config\**\*" target="content" />
+    </files>
+</package>

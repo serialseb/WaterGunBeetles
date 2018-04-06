@@ -1,7 +1,7 @@
 ﻿using System;
 using System.Threading.Tasks;
 
-namespace WaterGunBeetles.ConsoleTemplate.CSharp
+namespace WaterGunBeetles.Templates.CSharp
 {
   public class JourneyWalker
   {

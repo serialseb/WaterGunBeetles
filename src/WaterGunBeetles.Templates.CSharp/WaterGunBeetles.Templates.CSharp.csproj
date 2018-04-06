@@ -1,0 +1,12 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>netcoreapp2.0</TargetFramework>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="WaterGunBeetles" Version="1.0.0-preview.0.7" />
+  </ItemGroup>
+  <ItemGroup>
+    <DotNetCliToolReference Include="Amazon.Lambda.Tools" Version="2.1.1" />
+    <DotNetCliToolReference Include="WaterGunBeetles.Cli" Version="1.0.0-preview.0.7" />
+  </ItemGroup>
+</Project>

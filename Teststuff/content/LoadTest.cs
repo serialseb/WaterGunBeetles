@@ -1,12 +1,6 @@
-﻿using System.Collections.Generic;
-using System.Linq;
-using System.Runtime.CompilerServices;
-using System.Threading.Tasks;
-using WaterGunBeetles.Server.Aws;
+﻿using WaterGunBeetles;
 
-[assembly: TypeForwardedTo(typeof(LambdaFunction))]
-
-namespace WaterGunBeetles.ConsoleTemplate.CSharp
+namespace WaterGunBeetles.Templates.CSharp
 {
   public class LoadTest : IBeetlesConfiguration
   {
@@ -16,7 +10,7 @@ namespace WaterGunBeetles.ConsoleTemplate.CSharp
       var journeyWalker = new JourneyWalker();
       options
         .StoryTeller(count => storyTeller.CreateJourneys(count))
-        .OnStoryStart(()=> storyTeller.Initialize())
+        .OnStoryStart(() => storyTeller.Initialize())
         .JourneyWalker(journeyWalker.WalkJourney);
     }
   }
