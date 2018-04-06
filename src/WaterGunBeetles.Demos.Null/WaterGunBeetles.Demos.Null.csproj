@@ -3,6 +3,9 @@
     <TargetFramework>netcoreapp2.0</TargetFramework>
   </PropertyGroup>
   <ItemGroup>
-    <ProjectReference Include="..\WaterGunBeetles.Lambda\WaterGunBeetles.Lambda.csproj" />
+    <ProjectReference Include="..\WaterGunBeetles\WaterGunBeetles.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <DotNetCliToolReference Include="Amazon.Lambda.Tools" Version="2.1.1" />
   </ItemGroup>
 </Project>

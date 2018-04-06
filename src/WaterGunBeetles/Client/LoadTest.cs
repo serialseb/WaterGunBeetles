@@ -1,17 +1,17 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Diagnostics;
-using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Amazon.SimpleNotificationService.Model;
+using WaterGunBeetles.Internal;
 
-namespace WaterGunBeetles
+namespace WaterGunBeetles.Client
 {
 
   public class LoadTest
   {
-    readonly Func<int, IEnumerable<object>> _storyTeller;
+    readonly Func<int, Task<object[]>> _storyTeller;
     readonly IControlPlane _controlPlane;
     readonly Action<LoadTestStepContext> _onStep;
     readonly Func<IEnumerable<PublishRequest>, CancellationToken, Task> _publisher;
@@ -21,8 +21,7 @@ namespace WaterGunBeetles
       int requestsPerSecond,
       int rampUpTo,
       TimeSpan duration,
-      
-      Func<int, IEnumerable<object>> storyTeller,
+      Func<int, Task<object[]>> storyTeller,
       IControlPlane controlPlane,
       Action<LoadTestStepContext> onStep = null)
     {

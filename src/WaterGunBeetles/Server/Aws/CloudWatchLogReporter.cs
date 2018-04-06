@@ -1,7 +1,7 @@
 ﻿using System;
 using Amazon.Lambda.Core;
 
-namespace WaterGunBeetles.Lambda
+namespace WaterGunBeetles.Server.Aws
 {
   public class CloudWatchLogReporter<TJourney,TJourneyResult>
   {

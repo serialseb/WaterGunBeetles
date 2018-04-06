@@ -2,7 +2,7 @@
 using System.Diagnostics;
 using System.Threading.Tasks;
 
-namespace WaterGunBeetles
+namespace WaterGunBeetles.Internal
 {
   public class TaskSchedulingInterval
   {

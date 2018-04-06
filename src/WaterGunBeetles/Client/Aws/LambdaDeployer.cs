@@ -10,28 +10,38 @@ using Amazon.Lambda;
 using Amazon.Lambda.Model;
 using Amazon.SimpleNotificationService;
 using Amazon.SimpleNotificationService.Model;
+using WaterGunBeetles.Internal;
+using WaterGunBeetles.Server.Aws;
 using InvalidParameterValueException = Amazon.Lambda.Model.InvalidParameterValueException;
 using Statement = Amazon.Auth.AccessControlPolicy.Statement;
 
-namespace WaterGunBeetles.Aws
+namespace WaterGunBeetles.Client.Aws
 {
   public class LambdaDeployer
   {
     readonly string _timestamp;
     readonly string _packagePath;
+    readonly Type _settingsType;
     public IEnumerable<string> Topics { get; private set; }
     Func<Task> _cleanup;
 
-    public LambdaDeployer(
-      string timestamp,
-      string packagePath)
+    static readonly string LambdaHandlerName =
+      $"{typeof(LambdaFunction).Assembly.GetName().Name}::{typeof(LambdaFunction).FullName}::{nameof(LambdaFunction.Handle)}";
+
+    public LambdaDeployer(string timestamp,
+      string packagePath, Type settingsType)
     {
       _timestamp = timestamp;
       _packagePath = packagePath;
+      _settingsType = settingsType;
     }
 
-    static async Task<(IEnumerable<string> topicsArn, Func<Task> cleanup)> CreateLambdas(int count, int memorySize,
-      string timestamp, string packagePath)
+    static async Task<(IEnumerable<string> topicsArn, Func<Task> cleanup)> CreateLambdas(
+      int count,
+      int memorySize,
+      string timestamp,
+      string packagePath,
+      string settingsTypeName)
     {
       var cleanup = new List<Func<Task>>();
       var publishTopics = new List<string>(count);
@@ -50,14 +60,15 @@ namespace WaterGunBeetles.Aws
       });
 
 
-      var (roleArn, roleName, roleCleanup) = await CreateRole(iamClient, timestamp);
+      var (roleArn, _, roleCleanup) = await CreateRole(iamClient, timestamp);
       cleanup.Add(roleCleanup);
       try
       {
         for (var lambdaIndex = 0; lambdaIndex < count; lambdaIndex++)
         {
-          var (functionArn, functionName, functionCleanup) =
-            await CreateFunction(memorySize, roleArn, timestamp, lambdaIndex, lambdaClient, packagePath);
+          var (functionArn, _, functionCleanup) =
+            await CreateFunction(memorySize, roleArn, timestamp, lambdaIndex, lambdaClient, packagePath,
+              settingsTypeName);
           cleanup.Add(functionCleanup);
 
           var (topicArn, topicCleanup) = await CreateTopic(snsClient, timestamp, lambdaIndex);
@@ -92,7 +103,7 @@ namespace WaterGunBeetles.Aws
       var assumeRolePolicyDocument = CreateLambdaAssumeRolePolicy().ToJson();
       var roleName = $"Beetles_Role_{timestamp}";
       var policyName = $"Beetles_CloudWatch_Access_{timestamp}";
-      
+
       var role = await iamClient.CreateRoleAsync(new CreateRoleRequest()
       {
         RoleName = roleName,
@@ -107,12 +118,6 @@ namespace WaterGunBeetles.Aws
         PolicyDocument = CreateLambdaCloudWatchLogsPolicy().ToJson()
       });
 
-      while (true)
-      {
-        var response = await iamClient.GetRoleAsync(new GetRoleRequest() {RoleName = role.Role.RoleName});
-        break;
-      }
-      
       return (roleArn, role.Role.RoleName, async () =>
       {
         await iamClient.DeleteRolePolicyAsync(new DeleteRolePolicyRequest()
@@ -176,7 +181,8 @@ namespace WaterGunBeetles.Aws
       };
     }
 
-    static async Task<Func<Task>> AddExecutionFromSnsPermission(AmazonLambdaClient lambda, string functionArn, string topicArn)
+    static async Task<Func<Task>> AddExecutionFromSnsPermission(AmazonLambdaClient lambda, string functionArn,
+      string topicArn)
     {
       await lambda.AddPermissionAsync(new Amazon.Lambda.Model.AddPermissionRequest
       {
@@ -216,7 +222,7 @@ namespace WaterGunBeetles.Aws
     static async Task<(string functionArn, string functionName, Func<Task> functionCleanup)> CreateFunction(
       int memorySize,
       string roleArn,
-      string timestamp, int lambdaIndex, AmazonLambdaClient lambda, string packagePath)
+      string timestamp, int lambdaIndex, AmazonLambdaClient lambda, string packagePath, string configurationTypeName)
     {
       var functionName = $"Beetles_{timestamp}_{lambdaIndex}";
 
@@ -231,13 +237,20 @@ namespace WaterGunBeetles.Aws
             Code = new FunctionCode {ZipFile = new MemoryStream(File.ReadAllBytes(packagePath))},
             Description = "Beetle Tester Function",
             FunctionName = functionName,
-            Handler = "WaterGunBeetles.Lambda::WaterGunBeetles.Lambda.NullFunction::Handler",
+            Handler = LambdaHandlerName,
             MemorySize = memorySize,
             Publish = true,
             Role = roleArn,
             Runtime = "dotnetcore2.0",
             Timeout = 120,
-            VpcConfig = new VpcConfig { }
+            Environment = new Amazon.Lambda.Model.Environment
+            {
+              Variables =
+              {
+                [Constants.ConfigurationTypeNameKey] = configurationTypeName
+              }
+            },
+            VpcConfig = new VpcConfig()
           });
         }
         catch (InvalidParameterValueException) when (retryWait.Elapsed < TimeSpan.FromMinutes(1))
@@ -251,7 +264,8 @@ namespace WaterGunBeetles.Aws
 
     public async Task Deploy(int count, int memorySize)
     {
-      var (topics, cleanup) = await CreateLambdas(count, memorySize, _timestamp, _packagePath);
+      var (topics, cleanup) =
+        await CreateLambdas(count, memorySize, _timestamp, _packagePath, _settingsType.AssemblyQualifiedName);
 
       Topics = topics;
       _cleanup = cleanup;

@@ -1,7 +1,6 @@
 ﻿using System;
-using System.Diagnostics;
 
-namespace WaterGunBeetles
+namespace WaterGunBeetles.Client
 {
   public class LoadTestResult {
     public TimeSpan Elapsed { get; }

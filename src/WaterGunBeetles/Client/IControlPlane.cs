@@ -4,7 +4,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Amazon.SimpleNotificationService.Model;
 
-namespace WaterGunBeetles
+namespace WaterGunBeetles.Client
 {
   public interface IControlPlane
   {

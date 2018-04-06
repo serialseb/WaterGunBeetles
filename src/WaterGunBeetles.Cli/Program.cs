@@ -1,19 +1,17 @@
 ﻿using System;
-using System.Collections.Generic;
 using System.IO;
 using System.Linq;
-using System.Reflection;
 using System.Runtime.Loader;
 using System.Threading;
 using System.Threading.Tasks;
-using Amazon.SimpleNotificationService.Model;
 using CommandLine;
-using WaterGunBeetles.Aws;
-using WaterGunBeetles.Lambda;
+using WaterGunBeetles.Client;
+using WaterGunBeetles.Client.Aws;
+using WaterGunBeetles.Internal;
 
 namespace WaterGunBeetles.Cli
 {
-  class Program
+  static class Program
   {
     static async Task<int> Main(string[] args)
     {
@@ -31,15 +29,16 @@ namespace WaterGunBeetles.Cli
         Console.WriteLine("Beetles, abort mission!");
         ctrlC.Cancel();
       };
-      
+
       var timestamp = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
       var packagePath = options.PackagePath ?? GetDefaultPackagePath(options.Configuration, options.Framework);
-      
-      var target = LoadTypeInfo(options.Configuration, options.Framework);
+
+      var settings = LoadTypeInfo(options.Configuration, options.Framework);
       var deployer = new LambdaDeployer(
         timestamp: timestamp.ToString(),
-        packagePath: packagePath);
-      
+        packagePath: packagePath,
+        settingsType: settings.settingsType);
+
       var rps = options.RequestsPerSecond;
       var to = options.RampUpTo ?? rps;
       var duration = ParseDuration(options.Duration);
@@ -50,18 +49,17 @@ namespace WaterGunBeetles.Cli
         await deployer.Deploy(10, options.MemorySize);
         Console.WriteLine("Beetles, attack!");
 
-        var detailsLog = options.Verbose ? (Action<object>)WriteDetail : null;
+        var detailsLog = options.Verbose ? (Action<object>) WriteDetail : null;
         var lambdaControlPlane = new LambdaControlPlane(deployer.Topics.ToArray(), detailsLog: detailsLog);
 
-        Func<int, IEnumerable<object>> storyTeller = null;
         var nullLoadTest = new LoadTest(
           rps,
           to,
           duration,
-          storyTeller,
+          settings.model.StoryTeller,
           lambdaControlPlane,
           PrintLoadStep);
-        
+
         var result = await nullLoadTest.RunAsync(ctrlC.Token);
         Console.WriteLine($"Beetles have returned in {result.Elapsed}.");
       }
@@ -75,25 +73,17 @@ namespace WaterGunBeetles.Cli
       return 0;
     }
 
-    static (Assembly assembly, Type journeyType, Type journeyResponseType, TypeInfo storyTellerType) LoadTypeInfo(string configuration, string framework)
+    static (BeetlesMetaModel model, Type settingsType) LoadTypeInfo(
+      string buildConfiguration, string buildFramework)
     {
-        var proj = new DirectoryInfo(Directory.GetCurrentDirectory()).Name;
-      var assemblyPath = Path.Combine(Environment.CurrentDirectory, "bin", configuration, framework, proj) + ".dll";
+      var proj = new DirectoryInfo(Directory.GetCurrentDirectory()).Name;
+      var assemblyPath = Path.Combine(Environment.CurrentDirectory, "bin", buildConfiguration, buildFramework, proj) + ".dll";
       if (File.Exists(assemblyPath) == false)
         throw new ArgumentException($"Could not find an assembly at {assemblyPath}");
+      
       var assembly = AssemblyLoadContext.Default.LoadFromAssemblyPath(assemblyPath);
-      var functionType = assembly.DefinedTypes
-                           .FirstOrDefault(t =>
-                             t.IsGenericType && t.GetGenericTypeDefinition() == typeof(AwsLambdaFunction<,>))
-                         ?? throw new ArgumentException(
-                           $"Could not find a type inheriting from {typeof(AwsLambdaFunction<,>)}");
-      var args = functionType.GenericTypeArguments;
-      var journeyType = args[0];
-      var journeyResponseType = args[1];
-      var storyTellerInterface = typeof(IJourneyScript<>).MakeGenericType(journeyType);
-      var storyTellerType = assembly.DefinedTypes.FirstOrDefault(t => storyTellerInterface.IsAssignableFrom(t))
-                            ?? throw new ArgumentException($"Could not find a type implementing {storyTellerInterface}");
-      return (assembly,journeyType, journeyResponseType, storyTellerType);
+      var settings = MetaModelFactory.FromAssembly(assembly);
+      return settings;
     }
 
     static void WriteDetail(object obj)
@@ -127,7 +117,7 @@ namespace WaterGunBeetles.Cli
       var filePath = Path.Combine(Environment.CurrentDirectory, "bin", configuration, framework, proj) + ".zip";
       if (!File.Exists(filePath))
       {
-        throw new ArgumentException($"Could not find a package at {filePath}.");
+        throw new ArgumentException($"Could not find a package at {filePath}. Did you call 'dotnet lambda package'?");
       }
 
       return filePath;

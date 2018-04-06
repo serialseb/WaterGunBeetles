@@ -8,7 +8,7 @@ using Amazon.SimpleNotificationService;
 using Amazon.SimpleNotificationService.Model;
 using Newtonsoft.Json;
 
-namespace WaterGunBeetles.Aws
+namespace WaterGunBeetles.Client.Aws
 {
   public class LambdaControlPlane : IControlPlane
   {
@@ -18,33 +18,40 @@ namespace WaterGunBeetles.Aws
     {
       var totalRequestsRoundedUp = (int) Math.Ceiling(ctx.RequestsPerSecond * ctx.Duration.TotalSeconds);
 
-      var totalRequestsPerLambda = totalRequestsRoundedUp / MaxConcurrentExecutionPerLambda;
+      var totalRequestsPerLambdaInvocation = totalRequestsRoundedUp / MaxConcurrentExecutionPerLambda;
 
       var leftover = totalRequestsRoundedUp % MaxConcurrentExecutionPerLambda;
 
-      var lambdaRequests = Enumerable.Range(0, MaxConcurrentExecutionPerLambda)
+      var lambdaRequestCounts = Enumerable.Range(0, MaxConcurrentExecutionPerLambda)
         .Select(pos => pos < leftover
-          ? totalRequestsPerLambda + 1
-          : totalRequestsPerLambda)
+          ? totalRequestsPerLambdaInvocation + 1
+          : totalRequestsPerLambdaInvocation)
         .Where(count => count > 0)
-        .Select(count => new AwsLambdaRequest
-        {
-          RequestCount = count,
-          Journeys = ctx.StoryTeller(count).ToArray(),
-          Duration = ctx.Duration
-        });
+        .ToList();
+      
+      var publishRequests = new PublishRequest[lambdaRequestCounts.Count];
 
-      var publishRequests = lambdaRequests.Select((request, i) => new PublishRequest
+      for (var i = 0; i < lambdaRequestCounts.Count; i++)
       {
-        TopicArn = _controlPlaneTopicArns[i % _controlPlaneTopicArns.Length],
-        Message = JsonConvert.SerializeObject(request)
-      }).ToList();
+        var count = lambdaRequestCounts[i];
+        publishRequests[i] = new PublishRequest
+        {
+          TopicArn = _controlPlaneTopicArns[i % _controlPlaneTopicArns.Length],
+          Message = JsonConvert.SerializeObject(new LambdaRequest
+          {
+            RequestCount = count,
+            Journeys = await ctx.StoryTeller(count),
+            Duration = ctx.Duration
+          })
+        };
+      }
 
       await ctx.PublishAsync(publishRequests, ctx.Cancel);
     }
 
     readonly string[] _controlPlaneTopicArns;
     readonly Action<object> _details;
+    AmazonSimpleNotificationServiceClient _snsClient;
 
     public LambdaControlPlane(
       string[] controlPlaneTopicArns,
@@ -54,15 +61,13 @@ namespace WaterGunBeetles.Aws
       _controlPlaneTopicArns = controlPlaneTopicArns;
       _details = detailsLog ?? (_ => { });
       Publisher = publisher ?? SnsPublisher;
+      _snsClient =new AmazonSimpleNotificationServiceClient(Amazon.RegionEndpoint.EUWest2);
     }
 
     async Task SnsPublisher(IEnumerable<PublishRequest> publishRequests, CancellationToken cancellationToken)
     {
       var sw = Stopwatch.StartNew();
-      using (var snsClient = new AmazonSimpleNotificationServiceClient(Amazon.RegionEndpoint.EUWest2))
-      {
-        await Task.WhenAll(publishRequests.Select(async r => await snsClient.PublishAsync(r, cancellationToken)));
-      }
+        await Task.WhenAll(publishRequests.Select(r=>Task.Run(() => _snsClient.PublishAsync(r, cancellationToken), cancellationToken)));
 
       _details($"[VERBOSE] Published {publishRequests.Count()} in {sw.Elapsed}");
     }

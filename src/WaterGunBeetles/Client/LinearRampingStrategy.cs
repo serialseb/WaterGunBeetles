@@ -1,7 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 
-namespace WaterGunBeetles
+namespace WaterGunBeetles.Client
 {
   public class LinearRampingStrategy
   {

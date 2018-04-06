@@ -8,7 +8,8 @@ using Newtonsoft.Json;
 using Shouldly;
 using Tests.Infrastructure;
 using WaterGunBeetles;
-using WaterGunBeetles.Aws;
+using WaterGunBeetles.Client;
+using WaterGunBeetles.Client.Aws;
 using Xunit;
 
 namespace Tests
@@ -25,7 +26,7 @@ namespace Tests
       steps[0].Count.ShouldBe(21);
       steps[1].Count.ShouldBe(21);
 
-      var request1 = JsonConvert.DeserializeObject<AwsLambdaRequest>(steps[0][0].Message);
+      var request1 = JsonConvert.DeserializeObject<LambdaRequest>(steps[0][0].Message);
       request1.Duration.ShouldBe(TimeSpan.FromSeconds(1));
       request1.Journeys.Length.ShouldBe(1);
       request1.RequestCount.ShouldBe(1);
@@ -45,7 +46,7 @@ namespace Tests
       steps[3].Count.ShouldBe(4);
       steps[4].Count.ShouldBe(5);
 
-      var request1 = JsonConvert.DeserializeObject<AwsLambdaRequest>(steps[0][0].Message);
+      var request1 = JsonConvert.DeserializeObject<LambdaRequest>(steps[0][0].Message);
       request1.Duration.ShouldBe(TimeSpan.FromSeconds(1));
       request1.Journeys.Length.ShouldBe(1);
       request1.RequestCount.ShouldBe(1);
@@ -65,7 +66,7 @@ namespace Tests
       steps[3].Count.ShouldBe(20);
       steps[4].Count.ShouldBe(10);
 
-      var request1 = JsonConvert.DeserializeObject<AwsLambdaRequest>(steps[0][0].Message);
+      var request1 = JsonConvert.DeserializeObject<LambdaRequest>(steps[0][0].Message);
       request1.Duration.ShouldBe(TimeSpan.FromSeconds(1));
       request1.Journeys.Length.ShouldBe(1);
       request1.RequestCount.ShouldBe(1);
@@ -75,19 +76,17 @@ namespace Tests
       TimeSpan duration)
     {
       var publishedRequests = new List<List<PublishRequest>>();
-      var storyTeller = new MemoryJourneyScript();
       var loadTest = new LoadTest(
         requestsPerSecond,
         rampUpTo,
         duration,
-        count=> storyTeller.CreateJourneys(count),
+        async count => new[]{new MemoryJourney()},
         new LambdaControlPlane(new[] {"topic1"}, (requests, token) =>
         {
           publishedRequests.Add(requests.ToList());
           return Task.CompletedTask;
         }));
 
-      await storyTeller.Initialize();
       await loadTest.RunAsync(CancellationToken.None);
       return publishedRequests;
     }

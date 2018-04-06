@@ -4,25 +4,24 @@ using System.Threading.Tasks;
 using Amazon.Lambda.Core;
 using Amazon.Lambda.SNSEvents;
 using Newtonsoft.Json;
+using WaterGunBeetles.Internal;
 
 [assembly: LambdaSerializer(typeof(Amazon.Lambda.Serialization.Json.JsonSerializer))]
 
-namespace WaterGunBeetles.Lambda
+namespace WaterGunBeetles.Server.Aws
 {
-  public class AwsLambdaFunction<TJourney, TJourneyResult>
+  public class LambdaFunction<TJourney, TJourneyResult> : ILambdaFunction
   {
-    public delegate Task<TJourneyResult> JourneyTaker(TJourney journey);
+    readonly Func<TJourney, Task<TJourneyResult>> _journeyTaker;
 
-    readonly JourneyTaker _journeyTaker;
-
-    public AwsLambdaFunction(JourneyTaker journeyTaker)
+    public LambdaFunction(BeetlesMetaModel model)
     {
-      _journeyTaker = journeyTaker;
+      _journeyTaker = (Func<TJourney, Task<TJourneyResult>>) model.JourneyTaker;
     }
 
-    public async Task Handler(SNSEvent snsEvent, ILambdaContext context)
+    public async Task Handle(SNSEvent snsEvent, ILambdaContext context)
     {
-      var command = JsonConvert.DeserializeObject<AwsLambdaRequest<TJourney>>(snsEvent.Records[0].Sns.Message);
+      var command = JsonConvert.DeserializeObject<LambdaRequest<TJourney>>(snsEvent.Records[0].Sns.Message);
 
       var journeyReporter = new CloudWatchLogReporter<TJourney, TJourneyResult>(context.Logger);
 
@@ -40,7 +39,8 @@ namespace WaterGunBeetles.Lambda
       journeyReporter.ReportCompleted();
     }
 
-    void FireAndForgetJourneyWithLowMemoryStateDelegste(JourneyTaker journeyTaker, AwsLambdaRequest<TJourney> command,
+    static void FireAndForgetJourneyWithLowMemoryStateDelegste(Func<TJourney, Task<TJourneyResult>> journeyTaker,
+      LambdaRequest<TJourney> command,
       CloudWatchLogReporter<TJourney, TJourneyResult> cloudWatchLogReporter, int journeyIndex)
     {
       Task.Factory.StartNew(
@@ -51,7 +51,7 @@ namespace WaterGunBeetles.Lambda
         journeyIndex);
     }
 
-    async Task InvokeJourney(JourneyTaker journeyTaker,
+    static async Task InvokeJourney(Func<TJourney, Task<TJourneyResult>> journeyTaker,
       TJourney journey,
       CloudWatchLogReporter<TJourney, TJourneyResult> cloudWatchLogReporter)
     {
