@@ -6,8 +6,6 @@ using Amazon.Lambda.SNSEvents;
 using Newtonsoft.Json;
 using WaterGunBeetles.Internal;
 
-[assembly: LambdaSerializer(typeof(Amazon.Lambda.Serialization.Json.JsonSerializer))]
-
 namespace WaterGunBeetles.Server.Aws
 {
   public class LambdaFunction<TJourney, TJourneyResult> : ILambdaFunction

@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Linq;
 using System.Reflection;
+using Microsoft.Extensions.DependencyModel;
 
 namespace WaterGunBeetles.Internal
 {
@@ -8,7 +9,7 @@ namespace WaterGunBeetles.Internal
   {
     public static (BeetlesMetaModel model, Type settingsType) FromAssembly(Assembly assembly)
     {
-      var settingsType = assembly.DefinedTypes
+      var settingsType = assembly.ExportedTypes
                            .FirstOrDefault(typeof(IBeetlesConfiguration).IsAssignableFrom)
                          ?? throw new ArgumentException(
                            $"Could not find a type implementing {typeof(IBeetlesOptions)}");

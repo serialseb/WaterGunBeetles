@@ -8,25 +8,25 @@ namespace WaterGunBeetles.Cli
     [Option]
     public string PackagePath { get; set; }
 
-    [Option('m', Default = 128, HelpText = "The memory size used for the lambda function")]
+    [Option('m', "memory", Default = 128, HelpText = "The memory size used for the lambda function")]
     public int MemorySize { get; set; }
 
-    [Option('r', Required = true)]
+    [Option('r', "rps", Required = true, HelpText = "Number of requests/s to achieve")]
     public int RequestsPerSecond { get; set; }
 
-    [Option('d', Default = "1m")]
+    [Option('d', "duration", Required = true, HelpText = "Length of time to run the load test for, for example '1m' or '1h'.")]
     public string Duration { get; set; }
 
-    [Option('t', Default = null)]
+    [Option("rampto", Default = null, HelpText = "Number of request/s to ramp up to")]
     public int? RampUpTo { get; set; }
 
-    [Option('v', Default = false)]
+    [Option("verbose", Default = false)]
     public bool Verbose { get; set; }
 
-    [Option('c', Default = "Release")]
+    [Option('c',"configuration", Default = "Release")]
     public string Configuration { get; set; }
     
-    [Option('f', Default="netcoreapp2.0")]
+    [Option('f',"framework", Default="netcoreapp2.0")]
     public string Framework { get; set; }
   }
 }

@@ -1,6 +1,8 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Reflection;
 using System.Runtime.Loader;
 using System.Threading;
 using System.Threading.Tasks;
@@ -13,8 +15,14 @@ namespace WaterGunBeetles.Cli
 {
   static class Program
   {
+    static AssemblyInformationalVersionAttribute _version = (AssemblyInformationalVersionAttribute) Attribute.GetCustomAttribute(typeof(Program).Assembly,
+      typeof(AssemblyInformationalVersionAttribute));
+
+    static ShellAssemblyLoadContext _shellAsm;
+
     static async Task<int> Main(string[] args)
     {
+      Console.WriteLine($"💦🔫🐞 v{_version.InformationalVersion}");
       return await
         Parser.Default
           .ParseArguments<SquirtOptions>(args)
@@ -26,7 +34,7 @@ namespace WaterGunBeetles.Cli
       var ctrlC = new CancellationTokenSource();
       Console.CancelKeyPress += (sender, args) =>
       {
-        Console.WriteLine("Beetles, abort mission!");
+        Console.WriteLine("Beetles, abort!");
         ctrlC.Cancel();
       };
 
@@ -45,7 +53,7 @@ namespace WaterGunBeetles.Cli
       Console.WriteLine($"Load testing from {rps}rps to {to}rps for {duration} using lambda {packagePath}");
       try
       {
-        Console.WriteLine("Beetles are assembling...");
+        Console.WriteLine("Beetles, assemble!");
         await deployer.Deploy(10, options.MemorySize);
         Console.WriteLine("Beetles, attack!");
 
@@ -77,11 +85,14 @@ namespace WaterGunBeetles.Cli
       string buildConfiguration, string buildFramework)
     {
       var proj = new DirectoryInfo(Directory.GetCurrentDirectory()).Name;
-      var assemblyPath = Path.Combine(Environment.CurrentDirectory, "bin", buildConfiguration, buildFramework, proj) + ".dll";
+      var assemblyDir = Path.Combine(Environment.CurrentDirectory, "bin", buildConfiguration, buildFramework);
+      var assemblyPath = Path.Combine(assemblyDir, proj + ".dll");
       if (File.Exists(assemblyPath) == false)
         throw new ArgumentException($"Could not find an assembly at {assemblyPath}");
       
-      var assembly = AssemblyLoadContext.Default.LoadFromAssemblyPath(assemblyPath);
+      _shellAsm = new ShellAssemblyLoadContext(assemblyDir);
+      var assembly = _shellAsm.LoadFromAssemblyPath(assemblyPath);
+      
       var settings = MetaModelFactory.FromAssembly(assembly);
       return settings;
     }
@@ -121,6 +132,37 @@ namespace WaterGunBeetles.Cli
       }
 
       return filePath;
+    }
+  }
+
+  class ShellAssemblyLoadContext : AssemblyLoadContext
+  {
+    Dictionary<AssemblyName, Assembly> _loadedAsm;
+
+    public ShellAssemblyLoadContext(string basePath)
+    {
+      _loadedAsm = Directory.GetFiles(basePath, "*.dll")
+        .Select(TryLoadAssemblyName)
+        .Where(a => a != null)
+        .ToDictionary(a => a.GetName());
+    }
+
+    Assembly TryLoadAssemblyName(string path)
+    {
+      try
+      {
+        return Default.LoadFromAssemblyPath(path);
+
+      }
+      catch
+      {
+        return null;
+      }
+    }
+
+    protected override Assembly Load(AssemblyName assemblyName)
+    {
+      return _loadedAsm.TryGetValue(assemblyName, out var asm) ? asm : Default.LoadFromAssemblyName(assemblyName);
     }
   }
 }
