@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Reflection;
@@ -24,6 +25,7 @@ namespace WaterGunBeetles.Cli
     static async Task<int> Main(string[] args)
     {
       Console.WriteLine($"💦🔫🐞 v{_version.InformationalVersion}");
+
       return await
         Parser.Default
           .ParseArguments<SquirtOptions>(args)
@@ -86,7 +88,8 @@ namespace WaterGunBeetles.Cli
       string buildConfiguration, string buildFramework)
     {
       var proj = new DirectoryInfo(Directory.GetCurrentDirectory()).Name;
-      var assemblyDir = Path.Combine(Environment.CurrentDirectory, "bin", buildConfiguration, buildFramework, "publish");
+      var assemblyDir =
+        Path.Combine(Environment.CurrentDirectory, "bin", buildConfiguration, buildFramework, "publish");
       var assemblyPath = Path.Combine(assemblyDir, proj + ".dll");
       if (File.Exists(assemblyPath) == false)
         throw new ArgumentException($"Could not find an assembly at {assemblyPath}");
@@ -125,6 +128,7 @@ namespace WaterGunBeetles.Cli
 
     static string GetDefaultPackagePath(string configuration, string framework)
     {
+      BuildPackage(configuration, framework);
       var proj = new DirectoryInfo(Directory.GetCurrentDirectory()).Name;
       var filePath = Path.Combine(Environment.CurrentDirectory, "bin", configuration, framework, proj) + ".zip";
       if (!File.Exists(filePath))
@@ -133,6 +137,22 @@ namespace WaterGunBeetles.Cli
       }
 
       return filePath;
+    }
+
+    static void BuildPackage(string configuration, string framework)
+    {
+      var process = new Process
+      {
+        StartInfo = new ProcessStartInfo
+        {
+          FileName = "dotnet",
+          Arguments = $"lambda package -c {configuration} -f {framework}"
+        },
+      };
+      process.Start();
+      process.WaitForExit();
+      if (process.ExitCode != 0)
+        throw new InvalidOperationException("Could not build the lambda");
     }
   }
 
