@@ -21,7 +21,7 @@ namespace WaterGunBeetles.Client.Aws
         ctx.RequestsPerSecond,
         ctx.Duration.TotalSeconds,
         12);
-      
+
       var publishRequests = new PublishRequest[lambdaRequestCounts.Count];
 
       for (var i = 0; i < lambdaRequestCounts.Count; i++)
@@ -29,7 +29,7 @@ namespace WaterGunBeetles.Client.Aws
         var count = lambdaRequestCounts[i];
         publishRequests[i] = new PublishRequest
         {
-          TopicArn = _controlPlaneTopicArns[i % _controlPlaneTopicArns.Length],
+          TopicArn = _controlPlaneTopicArn,
           Message = JsonConvert.SerializeObject(new LambdaRequest
           {
             RequestCount = count,
@@ -42,25 +42,27 @@ namespace WaterGunBeetles.Client.Aws
       await ctx.PublishAsync(publishRequests, ctx.Cancel);
     }
 
-    readonly string[] _controlPlaneTopicArns;
+    readonly string _controlPlaneTopicArn;
     readonly Action<object> _details;
     readonly Lazy<AmazonSimpleNotificationServiceClient> _snsClient;
 
     public LambdaControlPlane(
-      string[] controlPlaneTopicArns,
+      string controlPlaneTopicArn,
       Func<IEnumerable<PublishRequest>, CancellationToken, Task> publisher = null,
       Action<object> detailsLog = null)
     {
-      _controlPlaneTopicArns = controlPlaneTopicArns;
+      _controlPlaneTopicArn = controlPlaneTopicArn;
       _details = detailsLog ?? (_ => { });
       Publisher = publisher ?? SnsPublisher;
-      _snsClient = new Lazy<AmazonSimpleNotificationServiceClient>(()=>new AmazonSimpleNotificationServiceClient(Amazon.RegionEndpoint.EUWest2));
+      _snsClient = new Lazy<AmazonSimpleNotificationServiceClient>(() =>
+        new AmazonSimpleNotificationServiceClient(Amazon.RegionEndpoint.EUWest2));
     }
 
     async Task SnsPublisher(IEnumerable<PublishRequest> publishRequests, CancellationToken cancellationToken)
     {
       var sw = Stopwatch.StartNew();
-        await Task.WhenAll(publishRequests.Select(r=>Task.Run(() => _snsClient.Value.PublishAsync(r, cancellationToken), cancellationToken)));
+      await Task.WhenAll(publishRequests.Select(r =>
+        Task.Run(() => _snsClient.Value.PublishAsync(r, cancellationToken), cancellationToken)));
 
       _details($"[VERBOSE] Published {publishRequests.Count()} in {sw.Elapsed}");
     }

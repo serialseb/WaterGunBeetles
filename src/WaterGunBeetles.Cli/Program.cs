@@ -55,11 +55,11 @@ namespace WaterGunBeetles.Cli
       try
       {
         Console.WriteLine("Beetles, assemble!");
-        await deployer.Deploy(1, options.MemorySize);
+        await deployer.Deploy(options.MemorySize);
         Console.WriteLine("Beetles, attack!");
 
         var detailsLog = options.Verbose ? (Action<object>) WriteDetail : null;
-        var lambdaControlPlane = new LambdaControlPlane(deployer.Topics.ToArray(), detailsLog: detailsLog);
+        var lambdaControlPlane = new LambdaControlPlane(deployer.Topic, detailsLog: detailsLog);
 
         var nullLoadTest = new LoadTest(
           rps,

@@ -22,7 +22,7 @@ namespace WaterGunBeetles.Client.Aws
     readonly string _timestamp;
     readonly string _packagePath;
     readonly Type _settingsType;
-    public IEnumerable<string> Topics { get; private set; }
+    public string Topic { get; private set; }
     Func<Task> _cleanup;
 
 
@@ -38,8 +38,7 @@ namespace WaterGunBeetles.Client.Aws
 
     }
 
-    static async Task<(IEnumerable<string> topicsArn, Func<Task> cleanup)> CreateLambdas(
-      int count,
+    static async Task<(string topicArn, Func<Task> cleanup)> CreateLambda(
       int memorySize,
       string timestamp,
       string packagePath,
@@ -47,7 +46,7 @@ namespace WaterGunBeetles.Client.Aws
       string lambdaHandlerName)
     {
       var cleanup = new List<Func<Task>>();
-      var publishTopics = new List<string>(count);
+      var publishTopic = "";
 
 
       var lambdaClient = new AmazonLambdaClient();
@@ -67,16 +66,14 @@ namespace WaterGunBeetles.Client.Aws
       cleanup.Add(roleCleanup);
       try
       {
-        for (var lambdaIndex = 0; lambdaIndex < count; lambdaIndex++)
-        {
           var (functionArn, _, functionCleanup) =
-            await CreateFunction(memorySize, roleArn, timestamp, lambdaIndex, lambdaClient, packagePath,
+            await CreateFunction(memorySize, roleArn, timestamp, lambdaClient, packagePath,
               settingsTypeName, lambdaHandlerName);
           cleanup.Add(functionCleanup);
 
-          var (topicArn, topicCleanup) = await CreateTopic(snsClient, timestamp, lambdaIndex);
+          var (topicArn, topicCleanup) = await CreateTopic(snsClient, timestamp);
           cleanup.Add(topicCleanup);
-          publishTopics.Add(topicArn);
+          publishTopic = topicArn;
 
           var subCleaner = await Subscribe(snsClient, functionArn, topicArn);
           cleanup.Add(subCleaner);
@@ -84,14 +81,13 @@ namespace WaterGunBeetles.Client.Aws
           var permCleanup = await AddExecutionFromSnsPermission(lambdaClient, functionArn, topicArn);
           cleanup.Add(permCleanup);
         }
-      }
       catch (Exception)
       {
         await Cleanup(cleanup);
         throw;
       }
 
-      return (publishTopics, () => Cleanup(cleanup));
+      return (publishTopic, () => Cleanup(cleanup));
     }
 
     static async Task Cleanup(List<Func<Task>> cleanup)
@@ -216,19 +212,19 @@ namespace WaterGunBeetles.Client.Aws
     }
 
     static async Task<(string topicArn, Func<Task> topicCleanup)> CreateTopic(
-      AmazonSimpleNotificationServiceClient snsClient, string timestamp, int lambdaIndex)
+      AmazonSimpleNotificationServiceClient snsClient, string timestamp)
     {
-      var topic = await snsClient.CreateTopicAsync($"Beetles_{timestamp}_{lambdaIndex}");
+      var topic = await snsClient.CreateTopicAsync($"Beetles_{timestamp}");
       return (topic.TopicArn, async () => await snsClient.DeleteTopicAsync(topic.TopicArn));
     }
 
     static async Task<(string functionArn, string functionName, Func<Task> functionCleanup)> CreateFunction(
       int memorySize,
       string roleArn,
-      string timestamp, int lambdaIndex, AmazonLambdaClient lambda, string packagePath, string configurationTypeName,
+      string timestamp,AmazonLambdaClient lambda, string packagePath, string configurationTypeName,
       string lambdaHandlerName)
     {
-      var functionName = $"Beetles_{timestamp}_{lambdaIndex}";
+      var functionName = $"Beetles_{timestamp}";
 
       var retryWait = Stopwatch.StartNew();
       CreateFunctionResponse function = null;
@@ -266,12 +262,12 @@ namespace WaterGunBeetles.Client.Aws
       return (functionArn, functionName, async () => await lambda.DeleteFunctionAsync(functionName));
     }
 
-    public async Task Deploy(int count, int memorySize)
+    public async Task Deploy(int memorySize)
     {
-      var (topics, cleanup) =
-        await CreateLambdas(count, memorySize, _timestamp, _packagePath, _settingsType.AssemblyQualifiedName, _lambdaHandlerName);
+      var (topic, cleanup) =
+        await CreateLambda(memorySize, _timestamp, _packagePath, _settingsType.AssemblyQualifiedName, _lambdaHandlerName);
 
-      Topics = topics;
+      Topic = topic;
       _cleanup = cleanup;
     }
 

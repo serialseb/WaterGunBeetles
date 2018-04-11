@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Diagnostics;
 using System.Threading.Tasks;
 using Amazon.Lambda.Core;
@@ -26,27 +27,31 @@ namespace WaterGunBeetles.Server.Aws
       var executionInterval = command.Duration / command.RequestCount;
 
       var scheduler = new TaskSchedulingInterval();
+      List<Task> pendingTasks = new List<Task>();
       for (var i = 0; i < command.RequestCount; i++)
       {
         scheduler.Start();
-        FireAndForgetJourneyWithLowMemoryStateDelegste(_journeyTaker, command, journeyReporter, i);
+        pendingTasks.Add(FireAndForgetJourneyWithLowMemoryStateDelegste(_journeyTaker, command, journeyReporter, i));
 
         await scheduler.WaitFor(executionInterval);
       }
 
+      await Task.WhenAll(pendingTasks);
       journeyReporter.ReportCompleted();
     }
 
-    static void FireAndForgetJourneyWithLowMemoryStateDelegste(Func<TJourney, Task<TJourneyResult>> journeyTaker,
+    static Task FireAndForgetJourneyWithLowMemoryStateDelegste(
+      Func<TJourney, Task<TJourneyResult>> journeyTaker,
       LambdaRequest<TJourney> command,
-      CloudWatchLogReporter<TJourney, TJourneyResult> cloudWatchLogReporter, int journeyIndex)
+      CloudWatchLogReporter<TJourney, TJourneyResult> cloudWatchLogReporter, 
+      int journeyIndex)
     {
-      Task.Factory.StartNew(
+      return Task.Factory.StartNew(
         iteration => InvokeJourney(
           journeyTaker,
           command.Journeys[(int) iteration % command.Journeys.Length],
           cloudWatchLogReporter),
-        journeyIndex);
+        journeyIndex).Unwrap();
     }
 
     static async Task InvokeJourney(Func<TJourney, Task<TJourneyResult>> journeyTaker,
