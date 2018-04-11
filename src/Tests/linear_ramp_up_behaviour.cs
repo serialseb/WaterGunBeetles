@@ -23,13 +23,23 @@ namespace Tests
         await RunMemoryLoadTest(requestsPerSecond: 21, rampUpTo: 21, duration: TimeSpan.FromSeconds(2));
 
       steps.Count.ShouldBe(2);
-      steps[0].Count.ShouldBe(21);
-      steps[1].Count.ShouldBe(21);
 
       var request1 = JsonConvert.DeserializeObject<LambdaRequest>(steps[0][0].Message);
       request1.Duration.ShouldBe(TimeSpan.FromSeconds(1));
       request1.Journeys.Length.ShouldBe(1);
-      request1.RequestCount.ShouldBe(1);
+      request1.RequestCount.ShouldBe(12);
+
+      var request2 = JsonConvert.DeserializeObject<LambdaRequest>(steps[0][1].Message);
+      request2.Duration.ShouldBe(TimeSpan.FromSeconds(1));
+      request2.Journeys.Length.ShouldBe(1);
+      request2.RequestCount.ShouldBe(9);
+    }
+
+    static int RequestCountForStep(List<PublishRequest> requests)
+    {
+      return requests
+        .Select(request => JsonConvert.DeserializeObject<LambdaRequest>(request.Message).RequestCount)
+        .Sum();
     }
 
     [Fact]
@@ -40,11 +50,11 @@ namespace Tests
 
 
       steps.Count.ShouldBe(5);
-      steps[0].Count.ShouldBe(1);
-      steps[1].Count.ShouldBe(2);
-      steps[2].Count.ShouldBe(3);
-      steps[3].Count.ShouldBe(4);
-      steps[4].Count.ShouldBe(5);
+      RequestCountForStep(steps[0]).ShouldBe(1);
+      RequestCountForStep(steps[1]).ShouldBe(2);
+      RequestCountForStep(steps[2]).ShouldBe(3);
+      RequestCountForStep(steps[3]).ShouldBe(4);
+      RequestCountForStep(steps[4]).ShouldBe(5);
 
       var request1 = JsonConvert.DeserializeObject<LambdaRequest>(steps[0][0].Message);
       request1.Duration.ShouldBe(TimeSpan.FromSeconds(1));
@@ -60,16 +70,16 @@ namespace Tests
 
 
       steps.Count.ShouldBe(5);
-      steps[0].Count.ShouldBe(50);
-      steps[1].Count.ShouldBe(40);
-      steps[2].Count.ShouldBe(30);
-      steps[3].Count.ShouldBe(20);
-      steps[4].Count.ShouldBe(10);
+      RequestCountForStep(steps[0]).ShouldBe(50);
+      RequestCountForStep(steps[1]).ShouldBe(40);
+      RequestCountForStep(steps[2]).ShouldBe(30);
+      RequestCountForStep(steps[3]).ShouldBe(20);
+      RequestCountForStep(steps[4]).ShouldBe(10);
 
       var request1 = JsonConvert.DeserializeObject<LambdaRequest>(steps[0][0].Message);
       request1.Duration.ShouldBe(TimeSpan.FromSeconds(1));
       request1.Journeys.Length.ShouldBe(1);
-      request1.RequestCount.ShouldBe(1);
+      request1.RequestCount.ShouldBe(12);
     }
 
     static async Task<List<List<PublishRequest>>> RunMemoryLoadTest(int requestsPerSecond, int rampUpTo,

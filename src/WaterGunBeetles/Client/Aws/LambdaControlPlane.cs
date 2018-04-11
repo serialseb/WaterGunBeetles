@@ -12,22 +12,15 @@ namespace WaterGunBeetles.Client.Aws
 {
   public class LambdaControlPlane : IControlPlane
   {
-    const int MaxConcurrentExecutionPerLambda = 200;
+    const int ProvisionedConcurrentExecutionForLambda = 600;
 
     public async Task SetLoad(LoadTestStepContext ctx)
     {
-      var totalRequestsRoundedUp = (int) Math.Ceiling(ctx.RequestsPerSecond * ctx.Duration.TotalSeconds);
-
-      var totalRequestsPerLambdaInvocation = totalRequestsRoundedUp / MaxConcurrentExecutionPerLambda;
-
-      var leftover = totalRequestsRoundedUp % MaxConcurrentExecutionPerLambda;
-
-      var lambdaRequestCounts = Enumerable.Range(0, MaxConcurrentExecutionPerLambda)
-        .Select(pos => pos < leftover
-          ? totalRequestsPerLambdaInvocation + 1
-          : totalRequestsPerLambdaInvocation)
-        .Where(count => count > 0)
-        .ToList();
+      var lambdaRequestCounts = JourneyCalcuations.JourneyCounts(
+        ProvisionedConcurrentExecutionForLambda,
+        ctx.RequestsPerSecond,
+        ctx.Duration.TotalSeconds,
+        12);
       
       var publishRequests = new PublishRequest[lambdaRequestCounts.Count];
 
