@@ -15,8 +15,9 @@ namespace WaterGunBeetles.Cli
 {
   static class Program
   {
-    static AssemblyInformationalVersionAttribute _version = (AssemblyInformationalVersionAttribute) Attribute.GetCustomAttribute(typeof(Program).Assembly,
-      typeof(AssemblyInformationalVersionAttribute));
+    static readonly AssemblyInformationalVersionAttribute _version =
+      (AssemblyInformationalVersionAttribute) Attribute.GetCustomAttribute(typeof(Program).Assembly,
+        typeof(AssemblyInformationalVersionAttribute));
 
     static ShellAssemblyLoadContext _shellAsm;
 
@@ -54,7 +55,7 @@ namespace WaterGunBeetles.Cli
       try
       {
         Console.WriteLine("Beetles, assemble!");
-        await deployer.Deploy(10, options.MemorySize);
+        await deployer.Deploy(1, options.MemorySize);
         Console.WriteLine("Beetles, attack!");
 
         var detailsLog = options.Verbose ? (Action<object>) WriteDetail : null;
@@ -85,14 +86,14 @@ namespace WaterGunBeetles.Cli
       string buildConfiguration, string buildFramework)
     {
       var proj = new DirectoryInfo(Directory.GetCurrentDirectory()).Name;
-      var assemblyDir = Path.Combine(Environment.CurrentDirectory, "bin", buildConfiguration, buildFramework);
+      var assemblyDir = Path.Combine(Environment.CurrentDirectory, "bin", buildConfiguration, buildFramework, "publish");
       var assemblyPath = Path.Combine(assemblyDir, proj + ".dll");
       if (File.Exists(assemblyPath) == false)
         throw new ArgumentException($"Could not find an assembly at {assemblyPath}");
-      
+
       _shellAsm = new ShellAssemblyLoadContext(assemblyDir);
       var assembly = _shellAsm.LoadFromAssemblyPath(assemblyPath);
-      
+
       var settings = MetaModelFactory.FromAssembly(assembly);
       return settings;
     }
@@ -152,7 +153,6 @@ namespace WaterGunBeetles.Cli
       try
       {
         return Default.LoadFromAssemblyPath(path);
-
       }
       catch
       {
@@ -162,7 +162,8 @@ namespace WaterGunBeetles.Cli
 
     protected override Assembly Load(AssemblyName assemblyName)
     {
-      return _loadedAsm.TryGetValue(assemblyName, out var asm) ? asm : Default.LoadFromAssemblyName(assemblyName);
+      return Default.LoadFromAssemblyName(assemblyName) ??
+             (_loadedAsm.TryGetValue(assemblyName, out var asm) ? asm : null);
     }
   }
 }
