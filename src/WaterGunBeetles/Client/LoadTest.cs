@@ -8,14 +8,13 @@ using WaterGunBeetles.Internal;
 
 namespace WaterGunBeetles.Client
 {
-
   public class LoadTest
   {
-    readonly Func<int, Task<object[]>> _storyTeller;
     readonly IControlPlane _controlPlane;
     readonly Action<LoadTestStepContext> _onStep;
     readonly Func<IEnumerable<PublishRequest>, CancellationToken, Task> _publisher;
     readonly LinearRampingStrategy _stategy;
+    readonly Func<int, Task<object[]>> _storyTeller;
 
     public LoadTest(
       int requestsPerSecond,
@@ -27,7 +26,7 @@ namespace WaterGunBeetles.Client
     {
       _storyTeller = storyTeller;
       _controlPlane = controlPlane;
-      _onStep = onStep ?? (_=>{});
+      _onStep = onStep ?? (_ => { });
       _publisher = controlPlane.Publisher;
       _stategy = new LinearRampingStrategy(requestsPerSecond, rampUpTo, duration);
     }

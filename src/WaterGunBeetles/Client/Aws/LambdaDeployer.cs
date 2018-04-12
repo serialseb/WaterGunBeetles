@@ -12,21 +12,21 @@ using Amazon.SimpleNotificationService;
 using Amazon.SimpleNotificationService.Model;
 using WaterGunBeetles.Internal;
 using WaterGunBeetles.Server.Aws;
+using AddPermissionRequest = Amazon.Lambda.Model.AddPermissionRequest;
+using Environment = Amazon.Lambda.Model.Environment;
 using InvalidParameterValueException = Amazon.Lambda.Model.InvalidParameterValueException;
+using RemovePermissionRequest = Amazon.Lambda.Model.RemovePermissionRequest;
 using Statement = Amazon.Auth.AccessControlPolicy.Statement;
 
 namespace WaterGunBeetles.Client.Aws
 {
   public class LambdaDeployer
   {
-    readonly string _timestamp;
+    readonly string _lambdaHandlerName;
     readonly string _packagePath;
     readonly Type _settingsType;
-    public string Topic { get; private set; }
+    readonly string _timestamp;
     Func<Task> _cleanup;
-
-
-    readonly string _lambdaHandlerName;
 
     public LambdaDeployer(
       string timestamp,
@@ -39,6 +39,8 @@ namespace WaterGunBeetles.Client.Aws
       _lambdaHandlerName =
         $"{settingsType.Assembly.GetName().Name}::{typeof(LambdaFunction).FullName}::{nameof(LambdaFunction.Handle)}";
     }
+
+    public string Topic { get; private set; }
 
     static async Task<(string topicArn, Func<Task> cleanup)> CreateLambda(LambdaCreationOptions lambdaCreationOptions)
     {
@@ -59,7 +61,8 @@ namespace WaterGunBeetles.Client.Aws
       });
 
 
-      var (roleArn, _, roleCleanup) = await CreateRole(iamClient, lambdaCreationOptions.Timestamp, lambdaCreationOptions.Name);
+      var (roleArn, _, roleCleanup) =
+        await CreateRole(iamClient, lambdaCreationOptions.Timestamp, lambdaCreationOptions.Name);
       cleanup.Add(roleCleanup);
       try
       {
@@ -69,7 +72,8 @@ namespace WaterGunBeetles.Client.Aws
             lambdaCreationOptions);
         cleanup.Add(functionCleanup);
 
-        var (topicArn, topicCleanup) = await CreateTopic(snsClient, lambdaCreationOptions.Timestamp, lambdaCreationOptions.Name);
+        var (topicArn, topicCleanup) =
+          await CreateTopic(snsClient, lambdaCreationOptions.Timestamp, lambdaCreationOptions.Name);
         cleanup.Add(topicCleanup);
         publishTopic = topicArn;
 
@@ -103,14 +107,14 @@ namespace WaterGunBeetles.Client.Aws
       var roleName = $"Beetles_{name}_{timestamp}";
       var policyName = $"Beetles_{name}_{timestamp}";
 
-      var role = await iamClient.CreateRoleAsync(new CreateRoleRequest()
+      var role = await iamClient.CreateRoleAsync(new CreateRoleRequest
       {
         RoleName = roleName,
         AssumeRolePolicyDocument = assumeRolePolicyDocument
       });
       var roleArn = role.Role.Arn;
 
-      await iamClient.PutRolePolicyAsync(new PutRolePolicyRequest()
+      await iamClient.PutRolePolicyAsync(new PutRolePolicyRequest
       {
         PolicyName = policyName,
         RoleName = role.Role.RoleName,
@@ -119,12 +123,12 @@ namespace WaterGunBeetles.Client.Aws
 
       return (roleArn, role.Role.RoleName, async () =>
       {
-        await iamClient.DeleteRolePolicyAsync(new DeleteRolePolicyRequest()
+        await iamClient.DeleteRolePolicyAsync(new DeleteRolePolicyRequest
         {
           RoleName = role.Role.RoleName,
           PolicyName = policyName
         });
-        await iamClient.DeleteRoleAsync(new DeleteRoleRequest() {RoleName = role.Role.RoleName});
+        await iamClient.DeleteRoleAsync(new DeleteRoleRequest {RoleName = role.Role.RoleName});
       });
     }
 
@@ -168,7 +172,7 @@ namespace WaterGunBeetles.Client.Aws
               new ActionIdentifier("logs:DescribeLogStreams"),
               new ActionIdentifier("logs:GetLogEvents"),
               new ActionIdentifier("logs:PutLogEvents"),
-              new ActionIdentifier("logs:FilterLogEvents"),
+              new ActionIdentifier("logs:FilterLogEvents")
             },
             Id = "",
             Resources =
@@ -184,7 +188,7 @@ namespace WaterGunBeetles.Client.Aws
       string functionArn,
       string topicArn)
     {
-      await lambda.AddPermissionAsync(new Amazon.Lambda.Model.AddPermissionRequest
+      await lambda.AddPermissionAsync(new AddPermissionRequest
       {
         Action = "lambda:InvokeFunction",
         StatementId = "AllowExecutionFromSNS",
@@ -193,7 +197,7 @@ namespace WaterGunBeetles.Client.Aws
         SourceArn = topicArn
       });
       return async () => await lambda.RemovePermissionAsync(
-        new Amazon.Lambda.Model.RemovePermissionRequest
+        new RemovePermissionRequest
         {
           FunctionName = functionArn,
           StatementId = "AllowExecutionFromSNS"
@@ -222,7 +226,8 @@ namespace WaterGunBeetles.Client.Aws
       return (topic.TopicArn, async () => await snsClient.DeleteTopicAsync(topic.TopicArn));
     }
 
-    static async Task<(string functionArn, string functionName, Func<Task> functionCleanup)> CreateFunction(string roleArn,
+    static async Task<(string functionArn, string functionName, Func<Task> functionCleanup)> CreateFunction(
+      string roleArn,
       IAmazonLambda lambda,
       LambdaCreationOptions options)
     {
@@ -245,7 +250,7 @@ namespace WaterGunBeetles.Client.Aws
             Role = roleArn,
             Runtime = "dotnetcore2.0",
             Timeout = 120,
-            Environment = new Amazon.Lambda.Model.Environment
+            Environment = new Environment
             {
               Variables =
               {
@@ -268,10 +273,10 @@ namespace WaterGunBeetles.Client.Aws
     {
       var (topic, cleanup) =
         await CreateLambda(new LambdaCreationOptions(
-          memorySize, 
-          _timestamp, 
+          memorySize,
+          _timestamp,
           _packagePath,
-          _settingsType.AssemblyQualifiedName, 
+          _settingsType.AssemblyQualifiedName,
           _lambdaHandlerName, name));
 
       Topic = topic;

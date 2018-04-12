@@ -18,7 +18,7 @@ namespace WaterGunBeetles
 
     public static IBeetlesJourney<TJourney> JourneyWalker<TJourney, TJourneyResult>(
       this IBeetlesJourney<TJourney> options,
-      Func<TJourney,Task<TJourneyResult>> journeyTaker)
+      Func<TJourney, Task<TJourneyResult>> journeyTaker)
     {
       options.MetaModel.JourneyTaker = journeyTaker;
       options.MetaModel.JourneyTypeResult = typeof(TJourneyResult);
@@ -27,7 +27,7 @@ namespace WaterGunBeetles
 
     public static T OnStoryStart<T>(this T options, Func<Task> onStoryStart) where T : IBeetlesOptions
     {
-      options.MetaModel.OnStoryStart = onStoryStart; 
+      options.MetaModel.OnStoryStart = onStoryStart;
       return options;
     }
   }

@@ -3,12 +3,12 @@ using Amazon.Lambda.Core;
 
 namespace WaterGunBeetles.Server.Aws
 {
-  public class CloudWatchLogReporter<TJourney,TJourneyResult>
+  public class CloudWatchLogReporter<TJourney, TJourneyResult>
   {
     readonly ILambdaLogger _log;
-    int _successCount;
     int _errorCount;
     TimeSpan _journeyTime = TimeSpan.Zero;
+    int _successCount;
 
     public CloudWatchLogReporter(ILambdaLogger log)
     {

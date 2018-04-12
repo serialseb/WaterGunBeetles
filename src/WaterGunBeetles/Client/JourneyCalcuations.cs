@@ -6,7 +6,9 @@ namespace WaterGunBeetles.Client
 {
   public static class JourneyCalcuations
   {
-    public static List<int> JourneyCounts(int provisionedConcurrency, int requestsPerSecond, double totalSeconds,
+    public static List<int> JourneyCounts(int provisionedConcurrency,
+      int requestsPerSecond,
+      double totalSeconds,
       int minJourneysPerExecution)
     {
       // This is pretty shit, but i have a fever, so i'll fix it and apologise later on. It works. Sue me.
@@ -25,7 +27,7 @@ namespace WaterGunBeetles.Client
         journeysLeftover = totalJourneys % provisionedConcurrency;
       }
 
-      var executions = (totalJourneys / journeysPerExecution);
+      var executions = totalJourneys / journeysPerExecution;
 
       var rounds = Enumerable.Range(0, executions).Select(pos => journeysPerExecution);
       if (journeysLeftover > 0)

@@ -179,7 +179,7 @@ namespace WaterGunBeetles.Cli
 
   class ShellAssemblyLoadContext : AssemblyLoadContext
   {
-    Dictionary<AssemblyName, Assembly> _loadedAsm;
+    readonly Dictionary<AssemblyName, Assembly> _loadedAsm;
 
     public ShellAssemblyLoadContext(string basePath)
     {

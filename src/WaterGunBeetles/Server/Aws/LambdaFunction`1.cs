@@ -27,7 +27,7 @@ namespace WaterGunBeetles.Server.Aws
       var executionInterval = command.Duration / command.RequestCount;
 
       var scheduler = new TaskSchedulingInterval();
-      List<Task> pendingTasks = new List<Task>();
+      var pendingTasks = new List<Task>();
       for (var i = 0; i < command.RequestCount; i++)
       {
         scheduler.Start();
@@ -43,7 +43,7 @@ namespace WaterGunBeetles.Server.Aws
     static Task FireAndForgetJourneyWithLowMemoryStateDelegste(
       Func<TJourney, Task<TJourneyResult>> journeyTaker,
       LambdaRequest<TJourney> command,
-      CloudWatchLogReporter<TJourney, TJourneyResult> cloudWatchLogReporter, 
+      CloudWatchLogReporter<TJourney, TJourneyResult> cloudWatchLogReporter,
       int journeyIndex)
     {
       return Task.Factory.StartNew(

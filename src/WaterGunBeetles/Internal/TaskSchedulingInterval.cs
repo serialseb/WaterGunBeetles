@@ -6,8 +6,8 @@ namespace WaterGunBeetles.Internal
 {
   public class TaskSchedulingInterval
   {
-    Stopwatch _timer = new Stopwatch();
     TimeSpan _accumulatedDelay = TimeSpan.Zero;
+    readonly Stopwatch _timer = new Stopwatch();
 
     public void Start()
     {
@@ -17,9 +17,9 @@ namespace WaterGunBeetles.Internal
     public async Task WaitFor(TimeSpan delay)
     {
       _timer.Stop();
-      
+
       var timeLeft = delay - _timer.Elapsed + _accumulatedDelay;
-      
+
       if (timeLeft > TimeSpan.Zero)
       {
         _accumulatedDelay = TimeSpan.Zero;
