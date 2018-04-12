@@ -42,7 +42,9 @@ namespace WaterGunBeetles.Cli
       };
 
       var timestamp = DateTimeOffset.UtcNow.ToString("yyyy-MM-dd_HHmmss");
-      var packagePath = options.PackagePath ?? GetDefaultPackagePath(options.Configuration, options.Framework);
+
+      Console.WriteLine("Preparing battle plan...");
+      var packagePath = options.PackagePath ?? GetDefaultPackagePath(options);
 
       var settings = LoadTypeInfo(options.Configuration, options.Framework);
 
@@ -61,7 +63,7 @@ namespace WaterGunBeetles.Cli
       {
         Console.WriteLine("Beetles, assemble!");
         await deployer.Deploy(options.MemorySize, settings.model.Name);
-        
+
         Console.WriteLine("Beetles, attack!");
 
         var detailsLog = options.Verbose ? (Action<object>) WriteDetail : null;
@@ -105,11 +107,11 @@ namespace WaterGunBeetles.Cli
       return MetaModelFactory.FromAssembly(assembly);
     }
 
-    static void WriteDetail(object obj)
+    static void WriteDetail(object details)
     {
       var prev = Console.ForegroundColor;
       Console.ForegroundColor = ConsoleColor.DarkGray;
-      Console.WriteLine(obj);
+      Console.WriteLine(details);
       Console.ForegroundColor = prev;
     }
 
@@ -130,11 +132,12 @@ namespace WaterGunBeetles.Cli
       Console.WriteLine($"[{obj.ExecutionTime.Elapsed}] Beetles in flight at {obj.RequestsPerSecond}rps");
     }
 
-    static string GetDefaultPackagePath(string configuration, string framework)
+    static string GetDefaultPackagePath(SquirtOptions options)
     {
-      BuildPackage(configuration, framework);
+        BuildPackage(options.Configuration, options.Framework, options.Verbose);
       var proj = new DirectoryInfo(Directory.GetCurrentDirectory()).Name;
-      var filePath = Path.Combine(Environment.CurrentDirectory, "bin", configuration, framework, proj) + ".zip";
+      var filePath = Path.Combine(Environment.CurrentDirectory, "bin", options.Configuration, options.Framework, proj) +
+                     ".zip";
       if (!File.Exists(filePath))
       {
         throw new ArgumentException($"Could not find a package at {filePath}. Did you call 'dotnet lambda package'?");
@@ -143,7 +146,7 @@ namespace WaterGunBeetles.Cli
       return filePath;
     }
 
-    static void BuildPackage(string configuration, string framework)
+    static void BuildPackage(string configuration, string framework, bool verbose = false)
     {
       var process = new Process
       {
@@ -151,10 +154,23 @@ namespace WaterGunBeetles.Cli
         {
           FileName = "dotnet",
           Arguments = $"lambda package -c {configuration} -f {framework}"
-        },
+        }
       };
+      var color = Console.ForegroundColor;
+      if (!verbose)
+      {
+        process.StartInfo.RedirectStandardError = true;
+        process.StartInfo.RedirectStandardOutput = true;
+      }
+      else
+      {
+        Console.ForegroundColor = ConsoleColor.DarkGray;
+      }
+
       process.Start();
       process.WaitForExit();
+
+      Console.ForegroundColor = color;
       if (process.ExitCode != 0)
         throw new InvalidOperationException("Could not build the lambda");
     }
