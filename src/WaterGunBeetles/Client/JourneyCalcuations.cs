@@ -15,20 +15,17 @@ namespace WaterGunBeetles.Client
       // This is pretty shit, but i have a fever, so i'll fix it and apologise later on. It works. Sue me.
       var totalJourneys = (int) Math.Ceiling(requestsPerSecond * totalSeconds);
 
-      var journeysPerExecution = totalJourneys / minJourneysPerExecution;
-      var journeysLeftover = totalJourneys % minJourneysPerExecution;
+      var theorerticalMaxJourneysAtDefault = provisionedConcurrency * minJourneysPerExecution;
+      
 
-      if (journeysPerExecution <= minJourneysPerExecution)
-      {
-        journeysPerExecution = minJourneysPerExecution;
-      }
-      else
-      {
-        journeysPerExecution = totalJourneys / provisionedConcurrency;
-        journeysLeftover = totalJourneys % provisionedConcurrency;
-      }
+      var journeysPerExecution = minJourneysPerExecution;
+      
+      if (totalJourneys > theorerticalMaxJourneysAtDefault)
+        journeysPerExecution = (int) Math.Floor((double)totalJourneys / provisionedConcurrency);
 
       var executions = totalJourneys / journeysPerExecution;
+      var journeysLeftover = totalJourneys % journeysPerExecution;
+      
 
       var rounds = Enumerable.Range(0, executions).Select(pos => journeysPerExecution);
       if (journeysLeftover > 0)

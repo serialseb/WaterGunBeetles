@@ -38,5 +38,15 @@ namespace Tests
       result.Count().ShouldBe(50);
     }
     
+    [Fact]
+    public void rounding()
+    {
+      // 5 rx/s for 60s = 300 requests
+      // 300 / 12 = 25 executions
+      
+      var result = JourneyCalcuations.JourneyCounts(600, 5, 60, 12);
+      result.Sum().ShouldBe(300);
+      result.Count().ShouldBe(25);
+    }
   }
 }
