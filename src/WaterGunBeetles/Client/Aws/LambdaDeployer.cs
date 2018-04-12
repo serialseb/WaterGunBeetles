@@ -24,20 +24,20 @@ namespace WaterGunBeetles.Client.Aws
   {
     readonly string _lambdaHandlerName;
     readonly string _packagePath;
-    readonly Type _settingsType;
+    readonly Type _configurationType;
     readonly string _timestamp;
     Func<Task> _cleanup;
 
     public LambdaDeployer(
       string timestamp,
       string packagePath,
-      Type settingsType)
+      Type configurationType)
     {
       _timestamp = timestamp;
       _packagePath = packagePath;
-      _settingsType = settingsType;
+      _configurationType = configurationType;
       _lambdaHandlerName =
-        $"{settingsType.Assembly.GetName().Name}::{typeof(LambdaFunction).FullName}::{nameof(LambdaFunction.Handle)}";
+        $"{configurationType.Assembly.GetName().Name}::{typeof(LambdaFunction).FullName}::{nameof(LambdaFunction.Handle)}";
     }
 
     public string Topic { get; private set; }
@@ -281,7 +281,7 @@ namespace WaterGunBeetles.Client.Aws
           memorySize,
           _timestamp,
           _packagePath,
-          _settingsType.AssemblyQualifiedName,
+          _configurationType.AssemblyQualifiedName,
           _lambdaHandlerName,
           name,
           provisionedConcurrency));

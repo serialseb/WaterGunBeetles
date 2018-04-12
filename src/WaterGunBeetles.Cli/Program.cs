@@ -46,12 +46,12 @@ namespace WaterGunBeetles.Cli
       Console.WriteLine("Preparing battle plan...");
       var packagePath = options.PackagePath ?? GetDefaultPackagePath(options);
 
-      var settings = LoadTypeInfo(options.Configuration, options.Framework);
+      var settings = LoadTypeInfo(options.Configuration, options.Framework, options.Name);
 
       var deployer = new LambdaDeployer(
         timestamp: timestamp,
         packagePath: packagePath,
-        settingsType: settings.settingsType);
+        configurationType: settings.ConfigurationType);
 
       var rps = options.RequestsPerSecond;
       var to = options.RampUpTo ?? rps;
@@ -62,7 +62,7 @@ namespace WaterGunBeetles.Cli
       try
       {
         Console.WriteLine("Beetles, assemble!");
-        await deployer.Deploy(options.MemorySize, settings.model.Name);
+        await deployer.Deploy(options.MemorySize, settings.Name);
 
         Console.WriteLine("Beetles, attack!");
 
@@ -73,7 +73,7 @@ namespace WaterGunBeetles.Cli
           rps,
           to,
           duration,
-          settings.model.StoryTeller,
+          settings.StoryTeller,
           lambdaControlPlane,
           PrintLoadStep);
 
@@ -90,9 +90,9 @@ namespace WaterGunBeetles.Cli
       return 0;
     }
 
-    static (BeetlesMetaModel model, Type settingsType) LoadTypeInfo(
-      string buildConfiguration,
-      string buildFramework)
+    static BeetlesMetaModel LoadTypeInfo(string buildConfiguration,
+      string buildFramework,
+      string name)
     {
       var proj = new DirectoryInfo(Directory.GetCurrentDirectory()).Name;
       var assemblyDir =
@@ -104,7 +104,7 @@ namespace WaterGunBeetles.Cli
       _shellAsm = new ShellAssemblyLoadContext(assemblyDir);
       var assembly = _shellAsm.LoadFromAssemblyPath(assemblyPath);
 
-      return MetaModelFactory.FromAssembly(assembly);
+      return MetaModelFactory.FromAssembly(assembly, name);
     }
 
     static void WriteDetail(object details)
@@ -139,10 +139,9 @@ namespace WaterGunBeetles.Cli
       var proj = new DirectoryInfo(Directory.GetCurrentDirectory()).Name;
       var filePath = Path.Combine(Environment.CurrentDirectory, "bin", options.Configuration, options.Framework, proj) +
                      ".zip";
+
       if (!File.Exists(filePath))
-      {
         throw new ArgumentException($"Could not find a package at {filePath}. Did you call 'dotnet lambda package'?");
-      }
 
       return filePath;
     }

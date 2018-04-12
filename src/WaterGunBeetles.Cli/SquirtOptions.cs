@@ -16,6 +16,9 @@ namespace WaterGunBeetles.Cli
 
     [Option('d', "duration", Required = true, HelpText = "Length of time to run the load test for, for example '1m' or '1h'.")]
     public string Duration { get; set; }
+    
+    [Option('n', "name", Required = false, HelpText = "Name of the Configuration object in the project. Defaults to the first one found.")]
+    public string Name { get; set; }
 
     [Option("rampto", Default = null, HelpText = "Number of request/s to ramp up to")]
     public int? RampUpTo { get; set; }

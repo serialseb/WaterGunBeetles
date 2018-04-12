@@ -14,5 +14,6 @@ namespace WaterGunBeetles.Internal
 
     public object JourneyTaker { get; set; }
     public Func<Task> OnStoryStart { get; set; }
+    public Type ConfigurationType { get; set; }
   }
 }
