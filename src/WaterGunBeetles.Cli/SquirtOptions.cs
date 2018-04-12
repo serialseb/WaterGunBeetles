@@ -23,10 +23,10 @@ namespace WaterGunBeetles.Cli
     [Option("verbose", Default = false)]
     public bool Verbose { get; set; }
 
-    [Option('c',"configuration", Default = "Release")]
+    [Option("configuration", Default = "Release")]
     public string Configuration { get; set; }
     
-    [Option('f',"framework", Default="netcoreapp2.0")]
+    [Option("framework", Default="netcoreapp2.0")]
     public string Framework { get; set; }
   }
 }
