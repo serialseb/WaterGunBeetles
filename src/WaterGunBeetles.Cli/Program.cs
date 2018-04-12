@@ -41,23 +41,27 @@ namespace WaterGunBeetles.Cli
         ctrlC.Cancel();
       };
 
-      var timestamp = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
+      var timestamp = DateTimeOffset.UtcNow.ToString("yyyy-MM-dd_HHmmss");
       var packagePath = options.PackagePath ?? GetDefaultPackagePath(options.Configuration, options.Framework);
 
       var settings = LoadTypeInfo(options.Configuration, options.Framework);
+
       var deployer = new LambdaDeployer(
-        timestamp: timestamp.ToString(),
+        timestamp: timestamp,
         packagePath: packagePath,
         settingsType: settings.settingsType);
 
       var rps = options.RequestsPerSecond;
       var to = options.RampUpTo ?? rps;
       var duration = ParseDuration(options.Duration);
+
       Console.WriteLine($"Load testing from {rps}rps to {to}rps for {duration} using lambda {packagePath}");
+
       try
       {
         Console.WriteLine("Beetles, assemble!");
-        await deployer.Deploy(options.MemorySize);
+        await deployer.Deploy(options.MemorySize, settings.model.Name);
+        
         Console.WriteLine("Beetles, attack!");
 
         var detailsLog = options.Verbose ? (Action<object>) WriteDetail : null;
@@ -85,7 +89,8 @@ namespace WaterGunBeetles.Cli
     }
 
     static (BeetlesMetaModel model, Type settingsType) LoadTypeInfo(
-      string buildConfiguration, string buildFramework)
+      string buildConfiguration,
+      string buildFramework)
     {
       var proj = new DirectoryInfo(Directory.GetCurrentDirectory()).Name;
       var assemblyDir =
@@ -97,8 +102,7 @@ namespace WaterGunBeetles.Cli
       _shellAsm = new ShellAssemblyLoadContext(assemblyDir);
       var assembly = _shellAsm.LoadFromAssemblyPath(assemblyPath);
 
-      var settings = MetaModelFactory.FromAssembly(assembly);
-      return settings;
+      return MetaModelFactory.FromAssembly(assembly);
     }
 
     static void WriteDetail(object obj)

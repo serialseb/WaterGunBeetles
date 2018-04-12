@@ -6,6 +6,7 @@ namespace WaterGunBeetles.Internal
 {
   public class BeetlesMetaModel
   {
+    public string Name { get; set; }
     public Func<int, Task<object[]>> StoryTeller { get; set; }
     IDictionary<string, object> Extensions { get; } = new Dictionary<string, object>();
     public Type JourneyType { get; set; }

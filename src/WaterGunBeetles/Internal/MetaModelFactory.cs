@@ -18,7 +18,7 @@ namespace WaterGunBeetles.Internal
 
     public static BeetlesMetaModel FromType(Type settingsType)
     {
-      var options = new BeetlesOptions();
+      var options = new BeetlesOptions() { MetaModel = { Name = settingsType.Name }};
       var configurator = (IBeetlesConfiguration) Activator.CreateInstance(settingsType);
       configurator.Configure(options);
       return options.MetaModel;
