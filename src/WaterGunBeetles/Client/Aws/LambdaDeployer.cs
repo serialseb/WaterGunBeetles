@@ -64,9 +64,9 @@ namespace WaterGunBeetles.Client.Aws
       try
       {
         var (functionArn, _, functionCleanup) =
-          await CreateFunction(lambdaCreationOptions.MemorySize, roleArn, lambdaCreationOptions.Timestamp, lambdaClient,
-            lambdaCreationOptions.PackagePath,
-            lambdaCreationOptions.SettingsTypeName, lambdaCreationOptions.LambdaHandlerName);
+          await CreateFunction(roleArn,
+            lambdaClient,
+            lambdaCreationOptions);
         cleanup.Add(functionCleanup);
 
         var (topicArn, topicCleanup) = await CreateTopic(snsClient, lambdaCreationOptions.Timestamp, lambdaCreationOptions.Name);
@@ -222,16 +222,11 @@ namespace WaterGunBeetles.Client.Aws
       return (topic.TopicArn, async () => await snsClient.DeleteTopicAsync(topic.TopicArn));
     }
 
-    static async Task<(string functionArn, string functionName, Func<Task> functionCleanup)> CreateFunction(
-      int memorySize,
-      string roleArn,
-      string timestamp,
-      AmazonLambdaClient lambda,
-      string packagePath,
-      string configurationTypeName,
-      string lambdaHandlerName)
+    static async Task<(string functionArn, string functionName, Func<Task> functionCleanup)> CreateFunction(string roleArn,
+      IAmazonLambda lambda,
+      LambdaCreationOptions options)
     {
-      var functionName = $"Beetles_{configurationTypeName}_{timestamp}";
+      var functionName = $"Beetles_{options.Name}_{options.Timestamp}";
 
       var retryWait = Stopwatch.StartNew();
       CreateFunctionResponse function = null;
@@ -241,11 +236,11 @@ namespace WaterGunBeetles.Client.Aws
         {
           function = await lambda.CreateFunctionAsync(new CreateFunctionRequest
           {
-            Code = new FunctionCode {ZipFile = new MemoryStream(File.ReadAllBytes(packagePath))},
-            Description = $"Beetles Load Test {configurationTypeName}",
+            Code = new FunctionCode {ZipFile = new MemoryStream(File.ReadAllBytes(options.PackagePath))},
+            Description = $"Beetles Load Test {options.Name}",
             FunctionName = functionName,
-            Handler = lambdaHandlerName,
-            MemorySize = memorySize,
+            Handler = options.LambdaHandlerName,
+            MemorySize = options.MemorySize,
             Publish = true,
             Role = roleArn,
             Runtime = "dotnetcore2.0",
@@ -254,7 +249,7 @@ namespace WaterGunBeetles.Client.Aws
             {
               Variables =
               {
-                [Constants.ConfigurationTypeNameKey] = configurationTypeName
+                [Constants.ConfigurationTypeNameKey] = options.SettingsTypeName
               }
             },
             VpcConfig = new VpcConfig()
