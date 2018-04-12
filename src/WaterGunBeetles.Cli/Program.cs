@@ -134,6 +134,7 @@ namespace WaterGunBeetles.Cli
 
     static string GetDefaultPackagePath(SquirtOptions options)
     {
+      if (options.Rebuild)
         BuildPackage(options.Configuration, options.Framework, options.Verbose);
       var proj = new DirectoryInfo(Directory.GetCurrentDirectory()).Name;
       var filePath = Path.Combine(Environment.CurrentDirectory, "bin", options.Configuration, options.Framework, proj) +

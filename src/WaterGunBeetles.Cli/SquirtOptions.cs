@@ -28,5 +28,8 @@ namespace WaterGunBeetles.Cli
     
     [Option("framework", Default="netcoreapp2.0")]
     public string Framework { get; set; }
+    
+    [Option("rebuild", Default = false)]
+    public bool Rebuild { get; set; }
   }
 }
