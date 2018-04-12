@@ -259,6 +259,11 @@ namespace WaterGunBeetles.Client.Aws
             },
             VpcConfig = new VpcConfig()
           });
+          await lambda.PutFunctionConcurrencyAsync(new PutFunctionConcurrencyRequest()
+          {
+            FunctionName = functionName,
+            ReservedConcurrentExecutions = options.ProvisionedConcurrency
+          });
         }
         catch (InvalidParameterValueException) when (retryWait.Elapsed < TimeSpan.FromMinutes(1))
         {
@@ -269,7 +274,7 @@ namespace WaterGunBeetles.Client.Aws
       return (functionArn, functionName, async () => await lambda.DeleteFunctionAsync(functionName));
     }
 
-    public async Task Deploy(int memorySize, string name)
+    public async Task Deploy(int memorySize, string name, int provisionedConcurrency = 600)
     {
       var (topic, cleanup) =
         await CreateLambda(new LambdaCreationOptions(
@@ -277,7 +282,9 @@ namespace WaterGunBeetles.Client.Aws
           _timestamp,
           _packagePath,
           _settingsType.AssemblyQualifiedName,
-          _lambdaHandlerName, name));
+          _lambdaHandlerName,
+          name,
+          provisionedConcurrency));
 
       Topic = topic;
       _cleanup = cleanup;

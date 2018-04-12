@@ -13,18 +13,19 @@ namespace WaterGunBeetles.Client.Aws
 {
   public class LambdaControlPlane : IControlPlane
   {
-    const int ProvisionedConcurrentExecutionForLambda = 600;
 
     readonly string _controlPlaneTopicArn;
+    readonly int _provisionedConcucrrency;
     readonly Action<object> _details;
     readonly Lazy<AmazonSimpleNotificationServiceClient> _snsClient;
 
-    public LambdaControlPlane(
-      string controlPlaneTopicArn,
+    public LambdaControlPlane(string controlPlaneTopicArn,
+      int provisionedConcucrrency,
       Func<IEnumerable<PublishRequest>, CancellationToken, Task> publisher = null,
       Action<object> detailsLog = null)
     {
       _controlPlaneTopicArn = controlPlaneTopicArn;
+      _provisionedConcucrrency = provisionedConcucrrency;
       _details = detailsLog ?? (_ => { });
       Publisher = publisher ?? SnsPublisher;
       _snsClient = new Lazy<AmazonSimpleNotificationServiceClient>(() =>
@@ -34,7 +35,7 @@ namespace WaterGunBeetles.Client.Aws
     public async Task SetLoad(LoadTestStepContext ctx)
     {
       var lambdaRequestCounts = JourneyCalcuations.JourneyCounts(
-        ProvisionedConcurrentExecutionForLambda,
+        _provisionedConcucrrency,
         ctx.RequestsPerSecond,
         ctx.Duration.TotalSeconds,
         12);

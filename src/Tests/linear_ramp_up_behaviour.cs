@@ -91,7 +91,7 @@ namespace Tests
         rampUpTo,
         duration,
         async count => new[] {new MemoryJourney()},
-        new LambdaControlPlane("topic1", (requests, token) =>
+        new LambdaControlPlane("topic1", 600, (requests, token) =>
         {
           publishedRequests.Add(requests.ToList());
           return Task.CompletedTask;

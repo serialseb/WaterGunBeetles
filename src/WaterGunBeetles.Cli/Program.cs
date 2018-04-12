@@ -67,7 +67,7 @@ namespace WaterGunBeetles.Cli
         Console.WriteLine("Beetles, attack!");
 
         var detailsLog = options.Verbose ? (Action<object>) WriteDetail : null;
-        var lambdaControlPlane = new LambdaControlPlane(deployer.Topic, detailsLog: detailsLog);
+        var lambdaControlPlane = new LambdaControlPlane(deployer.Topic, 600, detailsLog: detailsLog);
 
         var nullLoadTest = new LoadTest(
           rps,

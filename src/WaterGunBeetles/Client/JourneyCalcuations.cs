@@ -6,7 +6,8 @@ namespace WaterGunBeetles.Client
 {
   public static class JourneyCalcuations
   {
-    public static List<int> JourneyCounts(int provisionedConcurrency,
+    public static List<int> JourneyCounts(
+      int provisionedConcurrency,
       int requestsPerSecond,
       double totalSeconds,
       int minJourneysPerExecution)

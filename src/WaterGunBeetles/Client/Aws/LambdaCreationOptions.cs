@@ -7,7 +7,8 @@
       string packagePath,
       string settingsTypeName,
       string lambdaHandlerName,
-      string name)
+      string name,
+      int provisionedConcurrency)
     {
       MemorySize = memorySize;
       Timestamp = timestamp;
@@ -15,6 +16,7 @@
       SettingsTypeName = settingsTypeName;
       LambdaHandlerName = lambdaHandlerName;
       Name = name;
+      ProvisionedConcurrency = provisionedConcurrency;
     }
 
     public int MemorySize { get; }
@@ -23,5 +25,6 @@
     public string SettingsTypeName { get; }
     public string LambdaHandlerName { get; }
     public string Name { get; }
+    public int ProvisionedConcurrency { get; }
   }
 }
