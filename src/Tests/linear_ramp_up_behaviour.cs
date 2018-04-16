@@ -46,20 +46,20 @@ namespace Tests
     public async Task up()
     {
       var steps =
-        await RunMemoryLoadTest(requestsPerSecond: 1, rampUpTo: 5, duration: TimeSpan.FromSeconds(5));
+        await RunMemoryLoadTest(requestsPerSecond: 10, rampUpTo: 50, duration: TimeSpan.FromSeconds(5));
 
 
       steps.Count.ShouldBe(5);
-      RequestCountForStep(steps[0]).ShouldBe(1);
-      RequestCountForStep(steps[1]).ShouldBe(2);
-      RequestCountForStep(steps[2]).ShouldBe(3);
-      RequestCountForStep(steps[3]).ShouldBe(4);
-      RequestCountForStep(steps[4]).ShouldBe(5);
+      RequestCountForStep(steps[0]).ShouldBe(10);
+      RequestCountForStep(steps[1]).ShouldBe(20);
+      RequestCountForStep(steps[2]).ShouldBe(30);
+      RequestCountForStep(steps[3]).ShouldBe(40);
+      RequestCountForStep(steps[4]).ShouldBe(50);
 
       var request1 = JsonConvert.DeserializeObject<LambdaRequest>(steps[0][0].Message);
       request1.Duration.ShouldBe(TimeSpan.FromSeconds(1));
       request1.Journeys.Length.ShouldBe(1);
-      request1.RequestCount.ShouldBe(1);
+      request1.RequestCount.ShouldBe(10);
     }
 
     [Fact]
@@ -99,6 +99,28 @@ namespace Tests
 
       await loadTest.RunAsync(CancellationToken.None);
       return publishedRequests;
+    }
+  }
+
+    public class linear_rampup_calculations
+  {
+    [Fact]
+    public void up()
+    {
+      var steps = new LinearRampingStrategy(10, 50, TimeSpan.FromMinutes(10)).GetSteps().ToList();
+
+      steps.Count.ShouldBe(10);
+      steps[0].requestsPerSecond.ShouldBe(10);
+      steps[9].requestsPerSecond.ShouldBe(50);
+    }
+    [Fact]
+    public void down()
+    {
+      var steps = new LinearRampingStrategy(50, 10, TimeSpan.FromMinutes(10)).GetSteps().ToList();
+
+      steps.Count.ShouldBe(10);
+      steps[0].requestsPerSecond.ShouldBe(50);
+      steps[9].requestsPerSecond.ShouldBe(10);
     }
   }
 }

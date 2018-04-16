@@ -6,13 +6,15 @@ namespace WaterGunBeetles.Client
   public class LinearRampingStrategy
   {
     readonly int _from;
+    readonly int _to;
     readonly TimeSpan _stepDuration;
-    readonly int _stepRpsIncrease;
+    readonly double _stepRpsIncrease;
     readonly int _steps;
 
     public LinearRampingStrategy(int from, int to, TimeSpan totalDuration)
     {
       _from = from;
+      _to = to;
       var delta = to - from;
 
       if (totalDuration > TimeSpan.FromMinutes(1))
@@ -26,13 +28,23 @@ namespace WaterGunBeetles.Client
         _steps = (int) totalDuration.TotalSeconds;
       }
 
-      _stepRpsIncrease = _steps > 1 ? delta / (_steps - 1) : 0;
+      _stepRpsIncrease = _steps != 0 ? ((double) delta / (_steps - 1)) : 0;
     }
 
     public IEnumerable<(int requestsPerSecond, TimeSpan waitFor)> GetSteps()
     {
       for (var step = 0; step < _steps; step++)
-        yield return (_from + step * _stepRpsIncrease, _stepDuration);
+      {
+        var stepRps = (int)Math.Round(_from + step * _stepRpsIncrease);
+        if (GoingUp)
+          stepRps = Math.Min(_to, stepRps);
+        else if (GoingDown)
+          stepRps = Math.Max(_to, stepRps);
+        yield return (stepRps, _stepDuration);
+      }
     }
+
+    public bool GoingUp => _from < _to;
+    public bool GoingDown => _from >= _to;
   }
 }
