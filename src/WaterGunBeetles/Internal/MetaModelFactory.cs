@@ -19,7 +19,7 @@ namespace WaterGunBeetles.Internal
 
     static string GetTypeNotFoundMessage(string name)
     {
-      var message = $"Could not find a type implementing {typeof(IBeetlesOptions)}";
+      var message = $"Could not find a type implementing {typeof(IBeetlesConfiguration)}";
       if (name != null)
         message += $" named {name}";
       return message;

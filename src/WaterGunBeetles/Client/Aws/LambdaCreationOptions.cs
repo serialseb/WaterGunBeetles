@@ -1,4 +1,7 @@
-﻿namespace WaterGunBeetles.Client.Aws
+﻿using System;
+using System.Threading;
+
+namespace WaterGunBeetles.Client.Aws
 {
   public class LambdaCreationOptions
   {
@@ -8,7 +11,9 @@
       string settingsTypeName,
       string lambdaHandlerName,
       string name,
-      int provisionedConcurrency)
+      int provisionedConcurrency,
+      Action<object> verbose,
+      CancellationToken cancellationToken)
     {
       MemorySize = memorySize;
       Timestamp = timestamp;
@@ -17,6 +22,8 @@
       LambdaHandlerName = lambdaHandlerName;
       Name = name;
       ProvisionedConcurrency = provisionedConcurrency;
+      Verbose = verbose;
+      CancellationToken = cancellationToken;
     }
 
     public int MemorySize { get; }
@@ -26,5 +33,7 @@
     public string LambdaHandlerName { get; }
     public string Name { get; }
     public int ProvisionedConcurrency { get; }
+    public Action<object> Verbose { get; }
+    public CancellationToken CancellationToken { get; }
   }
 }

@@ -1,9 +1,10 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Diagnostics.CodeAnalysis;
 using System.IO;
+using System.Threading;
 using System.Threading.Tasks;
-using Amazon.Auth.AccessControlPolicy;
 using Amazon.IdentityManagement;
 using Amazon.IdentityManagement.Model;
 using Amazon.Lambda;
@@ -16,26 +17,29 @@ using AddPermissionRequest = Amazon.Lambda.Model.AddPermissionRequest;
 using Environment = Amazon.Lambda.Model.Environment;
 using InvalidParameterValueException = Amazon.Lambda.Model.InvalidParameterValueException;
 using RemovePermissionRequest = Amazon.Lambda.Model.RemovePermissionRequest;
-using Statement = Amazon.Auth.AccessControlPolicy.Statement;
 
 namespace WaterGunBeetles.Client.Aws
 {
+  [SuppressMessage("ReSharper", "MethodSupportsCancellation")]
   public class LambdaDeployer
   {
+     Action<object> Verbose { get; }
+    
     readonly string _lambdaHandlerName;
     readonly string _packagePath;
     readonly Type _configurationType;
     readonly string _timestamp;
     Func<Task> _cleanup;
 
-    public LambdaDeployer(
-      string timestamp,
+    public LambdaDeployer(string timestamp,
       string packagePath,
-      Type configurationType)
+      Type configurationType,
+      Action<object> verbose)
     {
       _timestamp = timestamp;
       _packagePath = packagePath;
       _configurationType = configurationType;
+      Verbose = verbose;
       _lambdaHandlerName =
         $"{configurationType.Assembly.GetName().Name}::{typeof(LambdaFunction).FullName}::{nameof(LambdaFunction.Handle)}";
     }
@@ -45,6 +49,7 @@ namespace WaterGunBeetles.Client.Aws
     static async Task<(string topicArn, Func<Task> cleanup)> CreateLambda(LambdaCreationOptions lambdaCreationOptions)
     {
       var cleanup = new List<Func<Task>>();
+      var log = lambdaCreationOptions.Verbose;
       string publishTopic;
 
 
@@ -61,30 +66,40 @@ namespace WaterGunBeetles.Client.Aws
       });
 
 
-      var (roleArn, _, roleCleanup) =
-        await CreateRole(iamClient, lambdaCreationOptions.Timestamp, lambdaCreationOptions.Name);
-      cleanup.Add(roleCleanup);
       try
       {
+        log("Creating IAM Role");
+        var (roleArn, _, roleCleanup) =
+          await CreateRole(iamClient, lambdaCreationOptions.Timestamp, lambdaCreationOptions.Name,
+            lambdaCreationOptions.CancellationToken);
+        cleanup.Add(roleCleanup);
+
+        log("Creating Function");
         var (functionArn, _, functionCleanup) =
           await CreateFunction(roleArn,
             lambdaClient,
             lambdaCreationOptions);
         cleanup.Add(functionCleanup);
 
+        log("Creating SNS Topic");
         var (topicArn, topicCleanup) =
-          await CreateTopic(snsClient, lambdaCreationOptions.Timestamp, lambdaCreationOptions.Name);
+          await CreateTopic(snsClient, lambdaCreationOptions.Timestamp, lambdaCreationOptions.Name,
+            lambdaCreationOptions.CancellationToken);
         cleanup.Add(topicCleanup);
         publishTopic = topicArn;
 
-        var subCleaner = await Subscribe(snsClient, functionArn, topicArn);
+        log("Creating SNS Subscription");
+        var subCleaner = await Subscribe(snsClient, functionArn, topicArn, lambdaCreationOptions.CancellationToken);
         cleanup.Add(subCleaner);
 
-        var permCleanup = await AddExecutionFromSnsPermission(lambdaClient, functionArn, topicArn);
+        log("Permissioning SNS to execute the function");
+        var permCleanup = await AddExecutionFromSnsPermission(lambdaClient, functionArn, topicArn,
+          lambdaCreationOptions.CancellationToken);
         cleanup.Add(permCleanup);
       }
       catch (Exception)
       {
+        log("Error detected, cleaning up resources");
         await Cleanup(cleanup);
         throw;
       }
@@ -101,9 +116,10 @@ namespace WaterGunBeetles.Client.Aws
     static async Task<(string roleArn, string roleName, Func<Task> roleCleanup)> CreateRole(
       IAmazonIdentityManagementService iamClient,
       string timestamp,
-      string name)
+      string name,
+      CancellationToken cancellationToken)
     {
-      var assumeRolePolicyDocument = CreateLambdaAssumeRolePolicy().ToJson();
+      var assumeRolePolicyDocument = Policies.CreateLambdaAssumeRolePolicy().ToJson();
       var roleName = $"Beetles_{name}_{timestamp}";
       var policyName = $"Beetles_{name}_{timestamp}";
 
@@ -111,15 +127,15 @@ namespace WaterGunBeetles.Client.Aws
       {
         RoleName = roleName,
         AssumeRolePolicyDocument = assumeRolePolicyDocument
-      });
+      }, cancellationToken);
       var roleArn = role.Role.Arn;
 
       await iamClient.PutRolePolicyAsync(new PutRolePolicyRequest
       {
         PolicyName = policyName,
         RoleName = role.Role.RoleName,
-        PolicyDocument = CreateLambdaCloudWatchLogsPolicy().ToJson()
-      });
+        PolicyDocument = Policies.CreateLambdaCloudWatchLogsPolicy().ToJson()
+      }, cancellationToken);
 
       return (roleArn, role.Role.RoleName, async () =>
       {
@@ -128,65 +144,15 @@ namespace WaterGunBeetles.Client.Aws
           RoleName = role.Role.RoleName,
           PolicyName = policyName
         });
+        
         await iamClient.DeleteRoleAsync(new DeleteRoleRequest {RoleName = role.Role.RoleName});
       });
     }
 
-    static Policy CreateLambdaAssumeRolePolicy()
-    {
-      return new Policy
-      {
-        Version = "2012-10-17",
-        Statements =
-        {
-          new Statement(Statement.StatementEffect.Allow)
-          {
-            Actions = {new ActionIdentifier("sts:AssumeRole")},
-            Id = "",
-            Principals =
-            {
-              new Principal("lambda.amazonaws.com")
-              {
-                Provider = "Service"
-              }
-            }
-          }
-        }
-      };
-    }
-
-    static Policy CreateLambdaCloudWatchLogsPolicy()
-    {
-      return new Policy
-      {
-        Version = "2012-10-17",
-        Statements =
-        {
-          new Statement(Statement.StatementEffect.Allow)
-          {
-            Actions =
-            {
-              new ActionIdentifier("logs:CreateLogGroup"),
-              new ActionIdentifier("logs:CreateLogStream"),
-              new ActionIdentifier("logs:DescribeLogGroups"),
-              new ActionIdentifier("logs:DescribeLogStreams"),
-              new ActionIdentifier("logs:GetLogEvents"),
-              new ActionIdentifier("logs:PutLogEvents"),
-              new ActionIdentifier("logs:FilterLogEvents")
-            },
-            Id = "",
-            Resources =
-            {
-              new Resource("arn:aws:logs:*:*:*")
-            }
-          }
-        }
-      };
-    }
-
-    static async Task<Func<Task>> AddExecutionFromSnsPermission(AmazonLambdaClient lambda,
+    static async Task<Func<Task>> AddExecutionFromSnsPermission(IAmazonLambda lambda,
       string functionArn,
-      string topicArn)
+      string topicArn,
+      CancellationToken cancellationToken)
     {
       await lambda.AddPermissionAsync(new AddPermissionRequest
       {
@@ -195,7 +161,7 @@ namespace WaterGunBeetles.Client.Aws
         FunctionName = functionArn,
         Principal = "sns.amazonaws.com",
         SourceArn = topicArn
-      });
+      }, cancellationToken);
       return async () => await lambda.RemovePermissionAsync(
         new RemovePermissionRequest
         {
@@ -206,23 +172,25 @@ namespace WaterGunBeetles.Client.Aws
 
     static async Task<Func<Task>> Subscribe(AmazonSimpleNotificationServiceClient snsClient,
       string functionArn,
-      string topicArn)
+      string topicArn,
+      CancellationToken cancellationToken)
     {
       var subscription = await snsClient.SubscribeAsync(new SubscribeRequest
       {
         Endpoint = functionArn,
         Protocol = "lambda",
         TopicArn = topicArn
-      });
+      }, cancellationToken);
       return async () => await snsClient.UnsubscribeAsync(subscription.SubscriptionArn);
     }
 
     static async Task<(string topicArn, Func<Task> topicCleanup)> CreateTopic(
       AmazonSimpleNotificationServiceClient snsClient,
       string timestamp,
-      string name)
+      string name,
+      CancellationToken cancellationToken)
     {
-      var topic = await snsClient.CreateTopicAsync($"Beetles_{name}_{timestamp}");
+      var topic = await snsClient.CreateTopicAsync($"Beetles_{name}_{timestamp}", cancellationToken);
       return (topic.TopicArn, async () => await snsClient.DeleteTopicAsync(topic.TopicArn));
     }
 
@@ -258,12 +226,12 @@ namespace WaterGunBeetles.Client.Aws
               }
             },
             VpcConfig = new VpcConfig()
-          });
-          await lambda.PutFunctionConcurrencyAsync(new PutFunctionConcurrencyRequest()
-          {
-            FunctionName = functionName,
-            ReservedConcurrentExecutions = options.ProvisionedConcurrency
-          });
+          }, options.CancellationToken);
+//          await lambda.PutFunctionConcurrencyAsync(new PutFunctionConcurrencyRequest()
+//          {
+//            FunctionName = functionName,
+//            ReservedConcurrentExecutions = options.ProvisionedConcurrency
+//          }, options.CancellationToken);
         }
         catch (InvalidParameterValueException) when (retryWait.Elapsed < TimeSpan.FromMinutes(1))
         {
@@ -274,7 +242,10 @@ namespace WaterGunBeetles.Client.Aws
       return (functionArn, functionName, async () => await lambda.DeleteFunctionAsync(functionName));
     }
 
-    public async Task Deploy(int memorySize, string name, int provisionedConcurrency = 600)
+    public async Task Deploy(int memorySize,
+      string name,
+      CancellationToken cancellationToken,
+      int provisionedConcurrency = 600)
     {
       var (topic, cleanup) =
         await CreateLambda(new LambdaCreationOptions(
@@ -284,7 +255,9 @@ namespace WaterGunBeetles.Client.Aws
           _configurationType.AssemblyQualifiedName,
           _lambdaHandlerName,
           name,
-          provisionedConcurrency));
+          provisionedConcurrency,
+          Verbose,
+          cancellationToken));
 
       Topic = topic;
       _cleanup = cleanup;

@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Diagnostics;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace WaterGunBeetles.Internal
@@ -14,7 +15,7 @@ namespace WaterGunBeetles.Internal
       _timer.Restart();
     }
 
-    public async Task WaitFor(TimeSpan delay)
+    public async Task WaitFor(TimeSpan delay, CancellationToken cancellationToken = default)
     {
       _timer.Stop();
 
@@ -23,7 +24,7 @@ namespace WaterGunBeetles.Internal
       if (timeLeft > TimeSpan.Zero)
       {
         _accumulatedDelay = TimeSpan.Zero;
-        await Task.Delay(timeLeft);
+        await Task.Delay(timeLeft, cancellationToken);
       }
       else
       {

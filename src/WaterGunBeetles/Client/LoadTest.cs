@@ -51,9 +51,7 @@ namespace WaterGunBeetles.Client
 
         await SetLoad(ctx);
 
-        await schedulingInterval.WaitFor(step.waitFor);
-        if (token.IsCancellationRequested)
-          break;
+        await schedulingInterval.WaitFor(step.waitFor, token);
       }
 
 

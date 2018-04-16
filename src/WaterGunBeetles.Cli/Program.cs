@@ -38,8 +38,10 @@ namespace WaterGunBeetles.Cli
       Console.CancelKeyPress += (sender, args) =>
       {
         Console.WriteLine("Beetles, abort!");
+        args.Cancel = true;
         ctrlC.Cancel();
       };
+      var verbose = options.Verbose ? (Action<object>) WriteVerbose : o => { };
 
       var timestamp = DateTimeOffset.UtcNow.ToString("yyyy-MM-dd_HHmmss");
 
@@ -51,7 +53,8 @@ namespace WaterGunBeetles.Cli
       var deployer = new LambdaDeployer(
         timestamp: timestamp,
         packagePath: packagePath,
-        configurationType: settings.ConfigurationType);
+        configurationType: settings.ConfigurationType,
+        verbose: verbose);
 
       var rps = options.RequestsPerSecond;
       var to = options.RampUpTo ?? rps;
@@ -62,12 +65,11 @@ namespace WaterGunBeetles.Cli
       try
       {
         Console.WriteLine("Beetles, assemble!");
-        await deployer.Deploy(options.MemorySize, settings.Name);
+        await deployer.Deploy(options.MemorySize, settings.Name, ctrlC.Token);
 
         Console.WriteLine("Beetles, attack!");
 
-        var detailsLog = options.Verbose ? (Action<object>) WriteDetail : null;
-        var lambdaControlPlane = new LambdaControlPlane(deployer.Topic, 600, detailsLog: detailsLog);
+        var lambdaControlPlane = new LambdaControlPlane(deployer.Topic, 600, detailsLog: verbose);
 
         var nullLoadTest = new LoadTest(
           rps,
@@ -80,13 +82,16 @@ namespace WaterGunBeetles.Cli
         var result = await nullLoadTest.RunAsync(ctrlC.Token);
         Console.WriteLine($"Beetles have returned in {result.Elapsed}.");
       }
+      catch (TaskCanceledException)
+      {
+      }
       finally
       {
         Console.WriteLine("Calling back the beetles...");
         await deployer.Shutdown();
       }
 
-      Console.WriteLine("It's goodbye from them, and it's goodbye from me.");
+      Console.WriteLine("It's goodbye from them, and it's goodbye from me!");
       return 0;
     }
 
@@ -107,7 +112,7 @@ namespace WaterGunBeetles.Cli
       return MetaModelFactory.FromAssembly(assembly, name);
     }
 
-    static void WriteDetail(object details)
+    static void WriteVerbose(object details)
     {
       var prev = Console.ForegroundColor;
       Console.ForegroundColor = ConsoleColor.DarkGray;
