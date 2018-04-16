@@ -95,11 +95,12 @@ namespace WaterGunBeetles.Client.Aws
         log("Permissioning SNS to execute the function");
         var permCleanup = await AddExecutionFromSnsPermission(lambdaClient, functionArn, topicArn,
           lambdaCreationOptions.CancellationToken);
+        
         cleanup.Add(permCleanup);
       }
       catch (Exception)
       {
-        log("Error detected, cleaning up resources");
+        log("Cleaning up resources");
         await Cleanup(cleanup);
         throw;
       }

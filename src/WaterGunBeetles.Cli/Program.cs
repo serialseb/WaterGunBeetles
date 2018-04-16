@@ -85,6 +85,12 @@ namespace WaterGunBeetles.Cli
       catch (TaskCanceledException)
       {
       }
+      catch (Exception e)
+      {
+        WriteError($"An error occured - {e.Message}");
+        
+        WriteVerbose(e.ToString());
+      }
       finally
       {
         Console.WriteLine("Calling back the beetles...");
@@ -112,6 +118,13 @@ namespace WaterGunBeetles.Cli
       return MetaModelFactory.FromAssembly(assembly, name);
     }
 
+    static void WriteError(object details)
+    {
+      var prev = Console.ForegroundColor;
+      Console.ForegroundColor = ConsoleColor.Red;
+      Console.WriteLine(details);
+      Console.ForegroundColor = prev;
+    }
     static void WriteVerbose(object details)
     {
       var prev = Console.ForegroundColor;
