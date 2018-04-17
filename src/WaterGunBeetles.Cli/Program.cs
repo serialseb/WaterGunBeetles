@@ -74,7 +74,7 @@ namespace WaterGunBeetles.Cli
         var nullLoadTest = new LoadTest(
           rps,
           duration,
-          Parser.Duration(options.WarmUpTime),
+          options.WarmUpTime != null ? Parser.Duration(options.WarmUpTime) : TimeSpan.Zero,
           settings.StoryTeller,
           lambdaControlPlane,
           PrintLoadStep);
