@@ -13,13 +13,14 @@ namespace WaterGunBeetles.Client
     readonly IControlPlane _controlPlane;
     readonly Action<LoadTestStepContext> _onStep;
     readonly Func<IEnumerable<PublishRequest>, CancellationToken, Task> _publisher;
-    readonly LinearRampingStrategy _stategy;
+    readonly LinearRampingStrategy _rampStategy;
     readonly Func<int, Task<object[]>> _storyTeller;
+    LinearRampingStrategy _runStrategy;
 
     public LoadTest(
       int requestsPerSecond,
-      int rampUpTo,
       TimeSpan duration,
+      TimeSpan rampTime,
       Func<int, Task<object[]>> storyTeller,
       IControlPlane controlPlane,
       Action<LoadTestStepContext> onStep = null)
@@ -28,7 +29,11 @@ namespace WaterGunBeetles.Client
       _controlPlane = controlPlane;
       _onStep = onStep ?? (_ => { });
       _publisher = controlPlane.Publisher;
-      _stategy = new LinearRampingStrategy(requestsPerSecond, rampUpTo, duration);
+      
+      var stepRps = (int)Math.Round(requestsPerSecond / (rampTime.TotalMinutes > 1 ? rampTime.TotalMinutes :  rampTime.TotalSeconds));
+      _rampStategy = new LinearRampingStrategy(stepRps, rampTime, requestsPerSecond);
+      _runStrategy = new LinearRampingStrategy(requestsPerSecond, duration);
+
     }
 
     public async Task<LoadTestResult> RunAsync(CancellationToken token = default)
@@ -42,8 +47,18 @@ namespace WaterGunBeetles.Client
         PublishAsync = _publisher
       };
 
+      await RunSteps(token, _rampStategy.GetSteps(), ctx);
+      await RunSteps(token, _runStrategy.GetSteps(), ctx);
+
+      ctx.ExecutionTime.Stop();
+      return new LoadTestResult(ctx.ExecutionTime.Elapsed);
+    }
+
+    async Task RunSteps(CancellationToken token, IEnumerable<(int requestsPerSecond, TimeSpan waitFor)> steps, LoadTestStepContext ctx)
+    {
       var schedulingInterval = new TaskSchedulingInterval();
-      foreach (var step in _stategy.GetSteps())
+
+      foreach (var step in steps)
       {
         schedulingInterval.Start();
         ctx.RequestsPerSecond = step.requestsPerSecond;
@@ -53,11 +68,6 @@ namespace WaterGunBeetles.Client
 
         await schedulingInterval.WaitFor(step.waitFor, token);
       }
-
-
-      ctx.ExecutionTime.Stop();
-
-      return new LoadTestResult(ctx.ExecutionTime.Elapsed);
     }
 
     async Task SetLoad(LoadTestStepContext ctx)

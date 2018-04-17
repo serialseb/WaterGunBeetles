@@ -1,4 +1,5 @@
-﻿using CommandLine;
+﻿using System;
+using CommandLine;
 
 namespace WaterGunBeetles.Cli
 {
@@ -11,7 +12,7 @@ namespace WaterGunBeetles.Cli
     [Option('m', "memory", Default = 128, HelpText = "The memory size used for the lambda function")]
     public int MemorySize { get; set; }
 
-    [Option('r', "rps", Required = true, HelpText = "Number of requests/s to achieve")]
+    [Option('r', "rate", Required = true, HelpText = "Number of requests/s to achieve")]
     public int RequestsPerSecond { get; set; }
 
     [Option('d', "duration", Required = true, HelpText = "Length of time to run the load test for, for example '1m' or '1h'.")]
@@ -19,11 +20,11 @@ namespace WaterGunBeetles.Cli
     
     [Option('n', "name", Required = false, HelpText = "Name of the Configuration object in the project. Defaults to the first one found.")]
     public string Name { get; set; }
+    
+    [Option('w', "warmup", Default = null, HelpText = "Duration of the warm-up.")]
+    public string WarmUpTime { get; set; }
 
-    [Option("rampto", Default = null, HelpText = "Number of request/s to ramp up to")]
-    public int? RampUpTo { get; set; }
-
-    [Option("verbose", Default = false)]
+    [Option('v', "verbose", Default = false, HelpText="Output verbose information")]
     public bool Verbose { get; set; }
 
     [Option("configuration", Default = "Release")]
@@ -34,5 +35,12 @@ namespace WaterGunBeetles.Cli
     
     [Option("rebuild", Default = false)]
     public bool Rebuild { get; set; }
+
+    public void Validate()
+    {
+      if (WarmUpTime != null && Duration != null && Parser.Duration(WarmUpTime) > Parser.Duration(Duration))
+        throw new ArgumentException($"{nameof(WarmUpTime)} cannot be less than the load test duration.");
+
+    }
   }
 }

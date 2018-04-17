@@ -11,12 +11,9 @@ namespace WaterGunBeetles.Client
     readonly double _stepRpsIncrease;
     readonly int _steps;
 
-    public LinearRampingStrategy(int from, int to, TimeSpan totalDuration)
+    public LinearRampingStrategy(int from, TimeSpan totalDuration, int to = -1)
     {
-      _from = from;
-      _to = to;
-      var delta = to - from;
-
+      if (to == -1) to = from;
       if (totalDuration > TimeSpan.FromMinutes(1))
       {
         _stepDuration = TimeSpan.FromMinutes(1);
@@ -27,6 +24,9 @@ namespace WaterGunBeetles.Client
         _stepDuration = TimeSpan.FromSeconds(1);
         _steps = (int) totalDuration.TotalSeconds;
       }
+      _from = from;
+      _to = to;
+      var delta = to - from;
 
       _stepRpsIncrease = _steps != 0 ? ((double) delta / (_steps - 1)) : 0;
     }

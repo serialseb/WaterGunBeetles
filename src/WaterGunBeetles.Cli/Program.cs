@@ -27,13 +27,14 @@ namespace WaterGunBeetles.Cli
       Console.WriteLine($"💦🔫🐞 v{_version.InformationalVersion}");
 
       return await
-        Parser.Default
+        CommandLine.Parser.Default
           .ParseArguments<SquirtOptions>(args)
           .MapResult(async options => await SquirtAsync(options), errs => Task.FromResult(1));
     }
 
     static async Task<int> SquirtAsync(SquirtOptions options)
     {
+      options.Validate();
       var ctrlC = new CancellationTokenSource();
       Console.CancelKeyPress += (sender, args) =>
       {
@@ -57,10 +58,9 @@ namespace WaterGunBeetles.Cli
         verbose: verbose);
 
       var rps = options.RequestsPerSecond;
-      var to = options.RampUpTo ?? rps;
-      var duration = ParseDuration(options.Duration);
+      var duration = Parser.Duration(options.Duration);
 
-      Console.WriteLine($"Load testing from {rps}rps to {to}rps for {duration} using lambda {packagePath}");
+      Console.WriteLine($"Load testing at {rps}rps for {duration} using lambda {packagePath}");
 
       try
       {
@@ -73,8 +73,8 @@ namespace WaterGunBeetles.Cli
 
         var nullLoadTest = new LoadTest(
           rps,
-          to,
           duration,
+          Parser.Duration(options.WarmUpTime),
           settings.StoryTeller,
           lambdaControlPlane,
           PrintLoadStep);
@@ -131,18 +131,6 @@ namespace WaterGunBeetles.Cli
       Console.ForegroundColor = ConsoleColor.DarkGray;
       Console.WriteLine(details);
       Console.ForegroundColor = prev;
-    }
-
-    static TimeSpan ParseDuration(string duration)
-    {
-      if (duration.EndsWith("s"))
-        return TimeSpan.FromSeconds(Convert.ToDouble(duration.Substring(0, duration.Length - 1)));
-      if (duration.EndsWith("m"))
-        return TimeSpan.FromMinutes(Convert.ToDouble(duration.Substring(0, duration.Length - 1)));
-      if (duration.EndsWith("h"))
-        return TimeSpan.FromHours(Convert.ToDouble(duration.Substring(0, duration.Length - 1)));
-
-      return TimeSpan.Parse(duration);
     }
 
     static void PrintLoadStep(LoadTestStepContext obj)
