@@ -30,21 +30,30 @@ namespace WaterGunBeetles.Server.Aws
       var scheduler = new TaskSchedulingInterval();
       
       var endOfStep = new CancellationTokenSource();
-      var endOfStepDuration = command.Duration + executionInterval;
+      var endOfStepDuration = command.Duration + (command.Duration/10);
       endOfStep.CancelAfter(endOfStepDuration);
-      var endOfStepTask = Task.Delay(endOfStepDuration + executionInterval, endOfStep.Token);
-      
-      var pendingTasks = new List<Task>();
-      for (var i = 0; i < command.RequestCount; i++)
-      {
-        scheduler.Start();
-        pendingTasks.Add(FireAndForgetJourneyWithLowMemoryStateDelegste(_journeyTaker, command, journeyReporter, i, endOfStep.Token));
+      var endOfStepTask = Task.Delay(endOfStepDuration, endOfStep.Token);
 
-        await scheduler.WaitFor(executionInterval, endOfStep.Token);
+      try
+      {
+        var pendingTasks = new List<Task>();
+        for (var i = 0; i < command.RequestCount; i++)
+        {
+          scheduler.Start();
+          pendingTasks.Add(FireAndForgetJourneyWithLowMemoryStateDelegste(_journeyTaker, command, journeyReporter, i,
+            endOfStep.Token));
+
+          await scheduler.WaitFor(executionInterval, endOfStep.Token);
+        }
+
+        var firstTask = await Task.WhenAny(Task.WhenAll(pendingTasks), endOfStepTask);
+        journeyReporter.ReportFinished(firstTask == endOfStepTask ? CompletionState.Timeout : CompletionState.Success);
+      }
+      catch(Exception e)
+      {
+        journeyReporter.ReportFinished(CompletionState.Error, e);
       }
 
-      await Task.WhenAny(Task.WhenAll(pendingTasks), endOfStepTask);
-      journeyReporter.ReportCompleted();
     }
 
     static Task FireAndForgetJourneyWithLowMemoryStateDelegste(Func<TJourney, Task<TJourneyResult>> journeyTaker,

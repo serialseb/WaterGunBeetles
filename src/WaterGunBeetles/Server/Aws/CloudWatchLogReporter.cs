@@ -29,10 +29,30 @@ namespace WaterGunBeetles.Server.Aws
       _journeyTime += duration;
     }
 
-    public void ReportCompleted()
+    public void ReportFinished(CompletionState state, Exception error = null)
     {
-      _log.Log(
-        $"[INFO] Completed {_errorCount + _successCount} journeys in {_journeyTime} (Success: {_successCount}, Errors: {_errorCount})");
+      if (error != null)
+      {
+        _log.Log(
+          $"[INFO] {state} - Completed {_errorCount + _successCount} journeys in {_journeyTime}" +
+          $" (Success: {_successCount}, Errors: {_errorCount}){Environment.NewLine}" +
+          $"{error}");
+        
+
+      }
+      else
+      {
+        _log.Log(
+        $"[INFO] {state} - Completed {_errorCount + _successCount} journeys in {_journeyTime} (Success: {_successCount}, Errors: {_errorCount})");
+        
+      }
     }
+  }
+
+  public enum CompletionState
+  {
+    Success,
+    Error,
+    Timeout
   }
 }
