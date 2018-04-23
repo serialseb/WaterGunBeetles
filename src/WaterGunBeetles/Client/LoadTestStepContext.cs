@@ -15,6 +15,6 @@ namespace WaterGunBeetles.Client
     public TimeSpan Duration { get; set; }
     public Guid LoadTestId { get; set; }
     public Func<int, Task<object[]>> StoryTeller { get; set; }
-    public Func<IEnumerable<PublishRequest>, CancellationToken, Task> PublishAsync { get; set; }
+    public Func<IEnumerable<PublishRequest>, TimeSpan, CancellationToken, Task> PublishAsync { get; set; }
   }
 }

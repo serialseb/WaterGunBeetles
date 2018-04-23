@@ -12,7 +12,7 @@ namespace WaterGunBeetles.Client
   {
     readonly IControlPlane _controlPlane;
     readonly Action<LoadTestStepContext> _onStep;
-    readonly Func<IEnumerable<PublishRequest>, CancellationToken, Task> _publisher;
+    readonly Func<IEnumerable<PublishRequest>, TimeSpan, CancellationToken, Task> _publisher;
     readonly LinearRampingStrategy _rampStategy;
     readonly Func<int, Task<object[]>> _storyTeller;
     LinearRampingStrategy _runStrategy;

@@ -8,6 +8,7 @@ using Amazon;
 using Amazon.SimpleNotificationService;
 using Amazon.SimpleNotificationService.Model;
 using Newtonsoft.Json;
+using WaterGunBeetles.Internal;
 
 namespace WaterGunBeetles.Client.Aws
 {
@@ -21,7 +22,7 @@ namespace WaterGunBeetles.Client.Aws
 
     public LambdaControlPlane(string controlPlaneTopicArn,
       int provisionedConcucrrency,
-      Func<IEnumerable<PublishRequest>, CancellationToken, Task> publisher = null,
+      Func<IEnumerable<PublishRequest>, TimeSpan, CancellationToken, Task> publisher = null,
       Action<object> detailsLog = null)
     {
       _controlPlaneTopicArn = controlPlaneTopicArn;
@@ -57,16 +58,22 @@ namespace WaterGunBeetles.Client.Aws
         };
       }
 
-      await ctx.PublishAsync(publishRequests, ctx.Cancel);
+      await ctx.PublishAsync(publishRequests, ctx.Duration, ctx.Cancel);
     }
 
-    public Func<IEnumerable<PublishRequest>, CancellationToken, Task> Publisher { get; set; }
+    public Func<IEnumerable<PublishRequest>, TimeSpan, CancellationToken, Task> Publisher { get; set; }
 
-    async Task SnsPublisher(IEnumerable<PublishRequest> publishRequests, CancellationToken cancellationToken)
+    async Task SnsPublisher(IEnumerable<PublishRequest> publishRequests, TimeSpan duration, CancellationToken cancellationToken)
     {
+      var publishTime = duration / publishRequests.Count();
       var sw = Stopwatch.StartNew();
-      await Task.WhenAll(publishRequests.Select(r =>
-        Task.Run(() => _snsClient.Value.PublishAsync(r, cancellationToken), cancellationToken)));
+      var scheduler = new TaskSchedulingInterval();
+      foreach (var r in publishRequests)
+      {
+        scheduler.Start();
+        await _snsClient.Value.PublishAsync(r, cancellationToken);
+        await scheduler.WaitFor(publishTime, cancellationToken);
+      }
 
       _details($"[VERBOSE] Requested {publishRequests.Count()} invocations in {sw.Elapsed}");
     }
