@@ -34,17 +34,15 @@ namespace WaterGunBeetles.Server.Aws
       if (error != null)
       {
         _log.Log(
-          $"[INFO] {state} - Completed {_errorCount + _successCount} journeys in {_journeyTime}" +
+          $"[ERROR] {state} - Completed {_errorCount + _successCount} journeys in {_journeyTime}" +
           $" (Success: {_successCount}, Errors: {_errorCount}){Environment.NewLine}" +
           $"{error}");
-        
-
       }
       else
       {
         _log.Log(
-        $"[INFO] {state} - Completed {_errorCount + _successCount} journeys in {_journeyTime} (Success: {_successCount}, Errors: {_errorCount})");
-        
+        $"[INFO] {state} - Completed {_errorCount + _successCount} journeys in {_journeyTime} " +
+        $"(Success: {_successCount}, Errors: {_errorCount})");
       }
     }
   }
