@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Threading;
 using System.Threading.Tasks;
 using Amazon.Lambda.Core;
 using Amazon.Lambda.SNSEvents;
@@ -27,31 +28,38 @@ namespace WaterGunBeetles.Server.Aws
       var executionInterval = command.Duration / command.RequestCount;
 
       var scheduler = new TaskSchedulingInterval();
+      
+      var endOfStep = new CancellationTokenSource();
+      var endOfStepDuration = command.Duration + executionInterval;
+      endOfStep.CancelAfter(endOfStepDuration);
+      var endOfStepTask = Task.Delay(endOfStepDuration + executionInterval, endOfStep.Token);
+      
       var pendingTasks = new List<Task>();
       for (var i = 0; i < command.RequestCount; i++)
       {
         scheduler.Start();
-        pendingTasks.Add(FireAndForgetJourneyWithLowMemoryStateDelegste(_journeyTaker, command, journeyReporter, i));
+        pendingTasks.Add(FireAndForgetJourneyWithLowMemoryStateDelegste(_journeyTaker, command, journeyReporter, i, endOfStep.Token));
 
-        await scheduler.WaitFor(executionInterval);
+        await scheduler.WaitFor(executionInterval, endOfStep.Token);
       }
 
-      await Task.WhenAll(pendingTasks);
+      await Task.WhenAny(Task.WhenAll(pendingTasks), endOfStepTask);
       journeyReporter.ReportCompleted();
     }
 
-    static Task FireAndForgetJourneyWithLowMemoryStateDelegste(
-      Func<TJourney, Task<TJourneyResult>> journeyTaker,
+    static Task FireAndForgetJourneyWithLowMemoryStateDelegste(Func<TJourney, Task<TJourneyResult>> journeyTaker,
       LambdaRequest<TJourney> command,
       CloudWatchLogReporter<TJourney, TJourneyResult> cloudWatchLogReporter,
-      int journeyIndex)
+      int journeyIndex,
+      CancellationToken token)
     {
       return Task.Factory.StartNew(
         iteration => InvokeJourney(
           journeyTaker,
           command.Journeys[(int) iteration % command.Journeys.Length],
           cloudWatchLogReporter),
-        journeyIndex).Unwrap();
+        journeyIndex,
+        token).Unwrap();
     }
 
     static async Task InvokeJourney(Func<TJourney, Task<TJourneyResult>> journeyTaker,
