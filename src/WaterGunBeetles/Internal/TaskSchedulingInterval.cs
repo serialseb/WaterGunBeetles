@@ -31,5 +31,5 @@ namespace WaterGunBeetles.Internal
         _accumulatedDelay = timeLeft;
       }
     }
-  }
+  } 
 }

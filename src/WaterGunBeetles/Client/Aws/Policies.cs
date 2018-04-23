@@ -14,7 +14,6 @@ namespace WaterGunBeetles.Client.Aws
           new Statement(Statement.StatementEffect.Allow)
           {
             Actions = {new ActionIdentifier("sts:AssumeRole")},
-            Id = "",
             Principals =
             {
               new Principal("lambda.amazonaws.com")

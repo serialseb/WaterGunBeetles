@@ -68,7 +68,7 @@ namespace WaterGunBeetles.Client.Aws
       await Task.WhenAll(publishRequests.Select(r =>
         Task.Run(() => _snsClient.Value.PublishAsync(r, cancellationToken), cancellationToken)));
 
-      _details($"[VERBOSE] Published {publishRequests.Count()} in {sw.Elapsed}");
+      _details($"[VERBOSE] Requested {publishRequests.Count()} invocations in {sw.Elapsed}");
     }
   }
 }
