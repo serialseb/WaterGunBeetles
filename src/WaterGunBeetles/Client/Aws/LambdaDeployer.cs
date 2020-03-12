@@ -217,7 +217,7 @@ namespace WaterGunBeetles.Client.Aws
             MemorySize = options.MemorySize,
             Publish = true,
             Role = roleArn,
-            Runtime = "dotnetcore2.0",
+            Runtime = "dotnetcore2.1",
             Timeout = 120,
             Environment = new Environment
             {
