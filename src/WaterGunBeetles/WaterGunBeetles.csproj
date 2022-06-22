@@ -23,7 +23,7 @@
     <PackageReference Include="AWSSDK.IdentityManagement" Version="3.3.6.1" />
     <PackageReference Include="AWSSDK.Lambda" Version="3.3.13" />
     <PackageReference Include="AWSSDK.SimpleNotificationService" Version="3.3.0.27" />
-    <PackageReference Include="Newtonsoft.Json" Version="11.0.2" />
+    <PackageReference Include="Newtonsoft.Json" Version="13.0.1" />
   </ItemGroup>
   <ItemGroup>
     <DotNetCliToolReference Include="Amazon.Lambda.Tools" Version="2.1.1" />
